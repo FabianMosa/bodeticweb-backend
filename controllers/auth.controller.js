@@ -12,7 +12,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'RUT y contraseña son requeridos' });
     }
 
-    // 2. Buscar al usuario en la BBDD por su RUT
+    // 2. Buscar al usuario en la BD por su RUT
     const [rows] = await pool.query('SELECT * FROM USUARIO WHERE rut = ?', [rut]);
 
     if (rows.length === 0) {
@@ -52,6 +52,6 @@ export const login = async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: 'Error interno del servidor-backend' });
   }
 };
