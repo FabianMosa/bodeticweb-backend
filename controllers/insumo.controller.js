@@ -27,3 +27,58 @@ export const getInsumos = async (req, res) => {
 };
 
 // (Aquí añadiremos después: POST, PUT, DELETE)
+// POST (Crear un Insumo)
+export const createInsumo = async (req, res) => {
+  // Obtenemos los datos del formulario
+  const { nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento } = req.body;
+  
+  // Obtenemos el ID del admin que está haciendo la operación (gracias al middleware)
+  const id_usuario_admin = req.usuario.id;
+
+  // Iniciamos una conexión 'cliente' para manejar la transacción
+  let connection;
+  try {
+    connection = await pool.getConnection(); // Pedimos una conexión del pool
+    await connection.beginTransaction(); // ¡Iniciamos la transacción!
+
+    // 1. Insertar el Insumo en la tabla INSUMO
+    const [insumoResult] = await connection.query(
+      `INSERT INTO INSUMO (nombre, sku, descripcion, stock_actual, stock_minimo, FK_id_categoria, fecha_vencimiento, activo) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      [nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento || null]
+    );
+
+    const nuevoInsumoId = insumoResult.insertId;
+
+    // 2. Insertar el Movimiento de 'Entrada' en la tabla MOVIMIENTO
+    await connection.query(
+      `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora) 
+       VALUES (?, ?, 'Entrada', ?, NOW())`,
+      [nuevoInsumoId, id_usuario_admin, stock_inicial]
+    );
+
+    // 3. Si todo salió bien, confirmamos la transacción
+    await connection.commit();
+
+    res.status(201).json({ message: 'Insumo creado con éxito', id: nuevoInsumoId });
+
+  } catch (error) {
+    // 4. Si algo falló, revertimos la transacción
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error(error);
+    
+    // Error común: SKU duplicado
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'El SKU o Nombre ingresado ya existe.' });
+    }
+    
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  } finally {
+    // 5. Siempre liberamos la conexión al final
+    if (connection) {
+      connection.release();
+    }
+  }
+};

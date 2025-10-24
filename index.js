@@ -6,6 +6,10 @@ import 'dotenv/config';
 // --- RUTAS ---
 import authRoutes from './routes/auth.routes.js';
 import insumoRoutes from './routes/insumo.routes.js';
+import categoriaRoutes from './routes/categoria.routes.js';
+
+// --- AÑADIR ESTA LÍNEA ---
+// Cualquier petición que empiece con "/api/categorias" será manejada por categoriaRoutes
 
 const app = express();
 
@@ -22,6 +26,7 @@ app.get('/', (req, res) => {
 // Cualquier petición que empiece con "/api/auth" será manejada por authRoutes
 app.use('/api/auth', authRoutes);
 app.use('/api/insumos', insumoRoutes);
+app.use('/api/categorias', categoriaRoutes);
 // ...otras rutas...
 
 const PORT = process.env.PORT || 3000;
