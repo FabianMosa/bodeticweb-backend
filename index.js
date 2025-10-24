@@ -3,8 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 
-// --- AÑADIR ESTA LÍNEA ---
+// --- RUTAS ---
 import authRoutes from './routes/auth.routes.js';
+import insumoRoutes from './routes/insumo.routes.js';
 
 const app = express();
 
@@ -20,7 +21,7 @@ app.get('/', (req, res) => {
 // --- AÑADIR ESTA LÍNEA ---
 // Cualquier petición que empiece con "/api/auth" será manejada por authRoutes
 app.use('/api/auth', authRoutes);
-
+app.use('/api/insumos', insumoRoutes);
 // ...otras rutas...
 
 const PORT = process.env.PORT || 3000;
