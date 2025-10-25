@@ -82,3 +82,80 @@ export const createInsumo = async (req, res) => {
     }
   }
 };
+
+// GET (Leer UN insumo por ID)
+export const getInsumoById = async (req, res) => {
+  const { id } = req.params; // Obtenemos el ID de la URL
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM INSUMO WHERE PK_id_insumo = ?', 
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Insumo no encontrado' });
+    }
+    
+    res.json(rows[0]); // Devolvemos solo el primer resultado
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// --- AÑADIR ESTA NUEVA FUNCIÓN ---
+// PUT (Actualizar un Insumo)
+export const updateInsumo = async (req, res) => {
+  const { id } = req.params;
+  // OJO: No permitimos actualizar el stock_actual aquí.
+  // Eso debe ser a través de un MOVIMIENTO (Salida, Préstamo, Ajuste).
+  const { nombre, sku, descripcion, stock_minimo, id_categoria, fecha_vencimiento } = req.body;
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE INSUMO SET 
+         nombre = ?, 
+         sku = ?, 
+         descripcion = ?, 
+         stock_minimo = ?, 
+         FK_id_categoria = ?, 
+         fecha_vencimiento = ?
+       WHERE PK_id_insumo = ?`,
+      [nombre, sku, descripcion, stock_minimo, id_categoria, fecha_vencimiento || null, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Insumo no encontrado' });
+    }
+
+    res.json({ message: 'Insumo actualizado con éxito' });
+
+  } catch (error) {
+    console.error(error);
+    // Error común: SKU duplicado
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'El SKU o Nombre ingresado ya existe.' });
+    }
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// DELETE (Eliminar un Insumo - desactivarlo)
+export const deleteInsumo = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await pool.query(
+      `UPDATE INSUMO SET activo = 0 WHERE PK_id_insumo = ?`,
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Insumo no encontrado' });
+    }
+
+    res.json({ message: 'Insumo eliminado (desactivado) con éxito' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};

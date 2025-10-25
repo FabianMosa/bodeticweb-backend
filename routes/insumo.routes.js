@@ -1,9 +1,12 @@
 
 import { Router } from 'express';
-import { getInsumos } from '../controllers/insumo.controller.js';
-import { verifyToken } from '../middleware/auth.middleware.js'; 
-import { isAdmin } from '../middleware/auth.middleware.js';
-import { createInsumo } from '../controllers/insumo.controller.js';
+import { verifyToken,isAdmin } from '../middleware/auth.middleware.js'; 
+import { 
+  getInsumos, 
+  createInsumo,
+  getInsumoById, 
+  updateInsumo  
+} from '../controllers/insumo.controller.js';
 
 
 const router = Router();
@@ -15,5 +18,14 @@ router.get('/', verifyToken, getInsumos);
 // (Aquí añadiremos después: POST, PUT, DELETE)
 // POST /api/insumos (Protegida por Token Y por rol de Admin)
 router.post('/', [verifyToken, isAdmin], createInsumo);
+
+// GET /api/insumos/:id (Protegida por Token)
+// La necesita el Admin (para editar) y el Técnico (para ver detalle)
+router.get('/:id', verifyToken, getInsumoById);
+
+// PUT /api/insumos/:id (Protegida por Admin)
+router.put('/:id', [verifyToken, isAdmin], updateInsumo);
+// DELETE /api/insumos/:id (Protegida por Admin)
+
 
 export default router;
