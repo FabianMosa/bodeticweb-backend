@@ -1,7 +1,7 @@
-// backend/routes/movimiento.routes.js
+
 import { Router } from 'express';
-import { registrarSalida } from '../controllers/movimiento.controller.js';
-import { verifyToken } from '../middleware/auth.middleware.js'; // Middleware de autenticación
+import { registrarSalida,registrarDevolucion } from '../controllers/movimiento.controller.js';
+import { verifyToken,isAdmin } from '../middleware/auth.middleware.js'; // Middleware de autenticación
 
 const router = Router();
 
@@ -9,6 +9,7 @@ const router = Router();
 // La protegemos con verifyToken (Cualquier usuario logueado, Admin o Técnico, puede usarla)
 router.post('/salida', verifyToken, registrarSalida);
 
-// (Aquí añadiremos después la ruta para DEVOLUCIONES)
+// POST /api/movimientos/devolucion (Protegida por Admin)
+router.post('/devolucion', [verifyToken, isAdmin], registrarDevolucion);
 
 export default router;

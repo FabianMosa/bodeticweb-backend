@@ -101,3 +101,70 @@ export const registrarSalida = async (req, res) => {
     }
   }
 };
+
+// POST (Registrar una Devolución de un Préstamo)
+export const registrarDevolucion = async (req, res) => {
+  // Datos que envía el Admin
+  const { id_insumo, cantidad_devuelta, id_usuario_tecnico } = req.body;
+  
+  // El ID del Admin que registra la devolución
+  const id_admin = req.usuario.id; 
+
+  if (!id_insumo || !cantidad_devuelta || !id_usuario_tecnico) {
+    return res.status(400).json({ message: 'Insumo, cantidad y técnico son requeridos' });
+  }
+  if (cantidad_devuelta <= 0) {
+    return res.status(400).json({ message: 'La cantidad debe ser mayor a cero' });
+  }
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction(); // ¡INICIA TRANSACCIÓN!
+
+    // (Validación Opcional Avanzada:
+    // Aquí podrías verificar que 'id_usuario_tecnico' realmente
+    // tenga 'cantidad_devuelta' de 'id_insumo' en préstamo.
+    // Por ahora, confiamos en la operación del Admin).
+
+    // ---- PASO 1: Incrementar el Stock del Insumo ----
+    await connection.query(
+      'UPDATE INSUMO SET stock_actual = stock_actual + ? WHERE PK_id_insumo = ?',
+      [cantidad_devuelta, id_insumo]
+    );
+
+    // ---- PASO 2: Registrar el Movimiento de "Devolución" (RF-11) ----
+    // Guardamos quién lo DEVUELVE (id_usuario_tecnico)
+    // y quién lo REGISTRA (id_admin) (aunque la BBDD solo tiene 1 campo de usuario,
+    // usaremos el del técnico que lo devuelve).
+    await connection.query(
+      `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora)
+       VALUES (?, ?, 'Devolución', ?, NOW())`,
+      [id_insumo, id_usuario_tecnico, cantidad_devuelta]
+    );
+
+    // ---- PASO 3: ¡ÉXITO! Confirmar la transacción ----
+    await connection.commit();
+    
+    // Consultamos el nuevo stock para devolverlo
+    const [stockRows] = await connection.query('SELECT stock_actual FROM INSUMO WHERE PK_id_insumo = ?', [id_insumo]);
+    
+    res.status(201).json({ 
+      message: 'Devolución registrada con éxito.',
+      nuevo_stock: stockRows[0].stock_actual
+    });
+
+  } catch (error) {
+    // ---- PASO 4: ¡ERROR! Revertir la transacción ----
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error(error);
+    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
+  } finally {
+    // 5. Siempre liberar la conexión
+    if (connection) {
+      connection.release();
+    }
+  }
+};
