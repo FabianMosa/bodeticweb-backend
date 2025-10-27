@@ -133,7 +133,7 @@ export const registrarDevolucion = async (req, res) => {
       [cantidad_devuelta, id_insumo]
     );
 
-    // ---- PASO 2: Registrar el Movimiento de "Devolución" (RF-11) ----
+    // ---- PASO 2: Registrar el Movimiento de "Devolución"----
     // Guardamos quién lo DEVUELVE (id_usuario_tecnico)
     // y quién lo REGISTRA (id_admin) (aunque la BBDD solo tiene 1 campo de usuario,
     // usaremos el del técnico que lo devuelve).
@@ -143,7 +143,7 @@ export const registrarDevolucion = async (req, res) => {
       [id_insumo, id_usuario_tecnico, cantidad_devuelta]
     );
 
-    // ---- PASO 3: ¡ÉXITO! Confirmar la transacción ----
+    // ----  ¡ÉXITO! Confirmar la transacción ----
     await connection.commit();
     
     // Consultamos el nuevo stock para devolverlo
@@ -155,7 +155,7 @@ export const registrarDevolucion = async (req, res) => {
     });
 
   } catch (error) {
-    // ---- PASO 4: ¡ERROR! Revertir la transacción ----
+    // ----  ¡ERROR! Revertir la transacción ----
     if (connection) {
       await connection.rollback();
     }
@@ -166,5 +166,55 @@ export const registrarDevolucion = async (req, res) => {
     if (connection) {
       connection.release();
     }
+  }
+};
+
+// GET (Listar Préstamos Pendientes)
+export const getPrestamosActivos = async (req, res) => {
+  // Obtenemos el ID y Rol del usuario desde el token
+  const id_usuario_token = req.usuario.id;
+  const id_rol_token = req.usuario.rol;
+
+  try {
+    // Esta consulta usa GROUP BY y HAVING para encontrar préstamos
+    // donde la suma de 'Préstamo' es MAYOR a la suma de 'Devolución'.
+    
+    let query = `
+      SELECT 
+        m.FK_id_insumo,
+        i.nombre AS nombre_insumo,
+        i.sku,
+        m.FK_id_usuario,
+        u.nombre AS nombre_usuario,
+        SUM(CASE WHEN m.tipo_movimiento = 'Préstamo' THEN m.cantidad ELSE 0 END) AS total_prestado,
+        SUM(CASE WHEN m.tipo_movimiento = 'Devolución' THEN m.cantidad ELSE 0 END) AS total_devuelto,
+        (SUM(CASE WHEN m.tipo_movimiento = 'Préstamo' THEN m.cantidad ELSE 0 END) -
+         SUM(CASE WHEN m.tipo_movimiento = 'Devolución' THEN m.cantidad ELSE 0 END)) AS cantidad_pendiente
+      FROM MOVIMIENTO m
+      JOIN INSUMO i ON m.FK_id_insumo = i.PK_id_insumo
+      JOIN USUARIO u ON m.FK_id_usuario = u.PK_id_usuario
+      WHERE m.tipo_movimiento IN ('Préstamo', 'Devolución')
+    `;
+    
+    const queryParams = [];
+
+    // Si NO es Admin (Rol 1), filtramos solo por su ID
+    if (id_rol_token !== 1) {
+      query += ' AND m.FK_id_usuario = ?';
+      queryParams.push(id_usuario_token);
+    }
+
+    query += `
+      GROUP BY m.FK_id_insumo, m.FK_id_usuario, i.nombre, i.sku, u.nombre
+      HAVING cantidad_pendiente > 0
+      ORDER BY u.nombre, i.nombre;
+    `;
+
+    const [rows] = await pool.query(query, queryParams);
+    res.json(rows);
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
   }
 };

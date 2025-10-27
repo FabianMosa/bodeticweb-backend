@@ -9,6 +9,8 @@ import insumoRoutes from './routes/insumo.routes.js';
 import categoriaRoutes from './routes/categoria.routes.js';
 import movimientoRoutes from './routes/movimiento.routes.js';
 import usuarioRoutes from './routes/usuario.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
+import rolRoutes from './routes/rol.routes.js';
 
 // --- AÑADIR ESTA LÍNEA ---
 // Cualquier petición que empiece con "/api/categorias" será manejada por categoriaRoutes
@@ -31,6 +33,8 @@ app.use('/api/insumos', insumoRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/movimientos', movimientoRoutes);
 app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/roles', rolRoutes);
 
 // ...otras rutas...
 
