@@ -186,6 +186,26 @@ export const toggleInsumoActivo = async (req, res) => {
   }
 };
 
+export const getInsumoBySku = async (req, res) => {
+  const { sku } = req.params; // Obtenemos el SKU de la URL
+  try {
+    // Buscamos el insumo que esté activo y coincida con el SKU
+    const [rows] = await pool.query(
+      'SELECT * FROM INSUMO WHERE sku = ? AND activo = 1', 
+      [sku]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Insumo no encontrado o inactivo' });
+    }
+    
+    res.json(rows[0]); // Devolvemos el insumo
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
 // DELETE (Eliminar un Insumo - desactivarlo)
 /*export const deleteInsumo = async (req, res) => {
   const { id } = req.params;

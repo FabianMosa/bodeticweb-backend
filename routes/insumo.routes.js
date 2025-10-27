@@ -6,7 +6,8 @@ import {
   createInsumo,
   getInsumoById, 
   updateInsumo,
-  toggleInsumoActivo  
+  toggleInsumoActivo,
+  getInsumoBySku    
 } from '../controllers/insumo.controller.js';
 
 
@@ -31,5 +32,6 @@ router.put('/:id', [verifyToken, isAdmin], updateInsumo);
 
 router.put('/:id/toggle-activo', [verifyToken, isAdmin], toggleInsumoActivo);
 
+router.get('/sku/:sku', verifyToken, getInsumoBySku);
 
 export default router;
