@@ -1,6 +1,6 @@
 
 import { pool } from '../config/db.js';
-import ExcelJs from 'exceljs';
+import ExcelJS from 'exceljs';
 
 // POST (Registrar una Salida, sea Uso o Préstamo)
 export const registrarSalida = async (req, res) => {
@@ -317,7 +317,7 @@ export const getHistorialMovimientos = async (req, res) => {
       res.end();
 
     } else {
-      // --- RESPUESTA COMO JSON (RF-11) ---
+      // --- RESPUESTA COMO JSON---
       res.json(rows);
     }
 
