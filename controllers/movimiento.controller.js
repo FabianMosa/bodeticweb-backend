@@ -1,5 +1,6 @@
 
 import { pool } from '../config/db.js';
+import ExcelJs from 'exceljs';
 
 // POST (Registrar una Salida, sea Uso o Préstamo)
 export const registrarSalida = async (req, res) => {
@@ -218,3 +219,111 @@ export const getPrestamosActivos = async (req, res) => {
     return res.status(500).json({ message: error.message || 'Error interno del servidor' });
   }
 };
+
+export const getHistorialMovimientos = async (req, res) => {
+  // Obtenemos los filtros de la URL (query string)
+  const { 
+    fecha_inicio, 
+    fecha_fin, 
+    id_insumo, 
+    id_usuario, 
+    tipo_movimiento,
+    formato // 'json' o 'excel'
+  } = req.query;
+
+  try {
+    // --- 1. Construcción de la Consulta Dinámica ---
+    let query = `
+      SELECT 
+        m.PK_id_movimiento,
+        m.fecha_hora,
+        m.tipo_movimiento,
+        m.cantidad,
+        i.nombre AS nombre_insumo,
+        u.nombre AS nombre_usuario,
+        ot.codigo_ot,
+        doc.codigo_documento
+      FROM MOVIMIENTO m
+      JOIN INSUMO i ON m.FK_id_insumo = i.PK_id_insumo
+      JOIN USUARIO u ON m.FK_id_usuario = u.PK_id_usuario
+      LEFT JOIN HOJA_TERRENO ot ON m.FK_id_ot = ot.PK_id_ot
+      LEFT JOIN DOCUMENTO_INGRESO doc ON m.FK_id_documento = doc.PK_id_documento
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+
+    if (fecha_inicio) {
+      query += ' AND DATE(m.fecha_hora) >= ?';
+      queryParams.push(fecha_inicio);
+    }
+    if (fecha_fin) {
+      query += ' AND DATE(m.fecha_hora) <= ?';
+      queryParams.push(fecha_fin);
+    }
+    if (id_insumo) {
+      query += ' AND m.FK_id_insumo = ?';
+      queryParams.push(id_insumo);
+    }
+    if (id_usuario) {
+      query += ' AND m.FK_id_usuario = ?';
+      queryParams.push(id_usuario);
+    }
+    if (tipo_movimiento) {
+      query += ' AND m.tipo_movimiento = ?';
+      queryParams.push(tipo_movimiento);
+    }
+
+    query += ' ORDER BY m.fecha_hora DESC LIMIT 1000'; // Limitar resultados
+
+    // --- 2. Ejecutar la Consulta ---
+    const [rows] = await pool.query(query, queryParams);
+
+    // --- 3. Decidir el formato de respuesta ---
+    if (formato === 'excel') {
+      // --- RESPUESTA COMO EXCEL (RF-08) ---
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'BodeTIC';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('Historial de Movimientos');
+      
+      // Definir Columnas
+      worksheet.columns = [
+        { header: 'ID', key: 'PK_id_movimiento', width: 10 },
+        { header: 'Fecha y Hora', key: 'fecha_hora', width: 25 },
+        { header: 'Tipo', key: 'tipo_movimiento', width: 15 },
+        { header: 'Insumo', key: 'nombre_insumo', width: 30 },
+        { header: 'Cantidad', key: 'cantidad', width: 10 },
+        { header: 'Usuario', key: 'nombre_usuario', width: 25 },
+        { header: 'OT', key: 'codigo_ot', width: 15 },
+        { header: 'Documento', key: 'codigo_documento', width: 15 },
+      ];
+      
+      // Añadir Filas
+      worksheet.addRows(rows);
+      
+      // Enviar el archivo al cliente
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="Reporte_BodeTIC.xlsx"'
+      );
+      
+      await workbook.xlsx.write(res);
+      res.end();
+
+    } else {
+      // --- RESPUESTA COMO JSON (RF-11) ---
+      res.json(rows);
+    }
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
+  }
+};
+
