@@ -1,10 +1,11 @@
+
 import { Router } from 'express';
 import { getProveedores } from '../controllers/proveedor.controller.js';
-import { verifyToken } from '../middleware/auth.middleware.js';
+import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-// Cualquiera que esté logueado (Admin o Técnico) puede ver los proveedores
-router.get('/', verifyToken, getProveedores);
+// Protegido por Admin, ya que solo ellos registran ingresos
+router.get('/', [verifyToken, isAdmin], getProveedores);
 
 export default router;

@@ -44,7 +44,9 @@ export const getInsumos = async (req, res) => {
 // POST (Crear un Insumo)
 export const createInsumo = async (req, res) => {
   // Obtenemos los datos del formulario
-  const { nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento } = req.body;
+  const { nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento,
+    id_proveedor,codigo_documento,fecha_emision
+   } = req.body;
   
   // Obtenemos el ID del admin que está haciendo la operación (gracias al middleware)
   const id_usuario_admin = req.usuario.id;
@@ -55,7 +57,15 @@ export const createInsumo = async (req, res) => {
     connection = await pool.getConnection(); // Pedimos una conexión del pool
     await connection.beginTransaction(); // ¡Iniciamos la transacción!
 
-    // 1. Insertar el Insumo en la tabla INSUMO
+    // Insertar el Documento de Ingreso
+    const [docResult] = await connection.query(
+      `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
+       VALUES (?, ?, ?)`,
+      [id_proveedor, codigo_documento, fecha_emision]
+    );
+    const newDocumentoId = docResult.insertId;
+
+    // Insertar el Insumo en la tabla INSUMO
     const [insumoResult] = await connection.query(
       `INSERT INTO INSUMO (nombre, sku, descripcion, stock_actual, stock_minimo, FK_id_categoria, fecha_vencimiento, activo) 
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
@@ -63,18 +73,18 @@ export const createInsumo = async (req, res) => {
     );
 
     const nuevoInsumoId = insumoResult.insertId;
-
-    // 2. Insertar el Movimiento de 'Entrada' en la tabla MOVIMIENTO
-    await connection.query(
-      `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora) 
-       VALUES (?, ?, 'Entrada', ?, NOW())`,
-      [nuevoInsumoId, id_usuario_admin, stock_inicial]
+    //Insertar el Movimiento de 'Entrada' vinculado al Documento
+await connection.query(
+      `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora, FK_id_documento) 
+       VALUES (?, ?, 'Entrada', ?, NOW(), ?)`,
+      [nuevoInsumoId, id_usuario_admin, stock_inicial, newDocumentoId] // <-- ID del documento añadido
     );
+    
 
-    // 3. Si todo salió bien, confirmamos la transacción
+    // confirmamos la transacción
     await connection.commit();
 
-    res.status(201).json({ message: 'Insumo creado con éxito', id: nuevoInsumoId });
+    res.status(201).json({ message: 'Insumo y documento creados con éxito', id: nuevoInsumoId });
 
   } catch (error) {
     // 4. Si algo falló, revertimos la transacción
@@ -85,7 +95,7 @@ export const createInsumo = async (req, res) => {
     
     // Error común: SKU duplicado
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'El SKU o Nombre ingresado ya existe.' });
+      return res.status(400).json({ message: 'El SKU, Nombre o Número de Nombre ingresado ya existe.' });
     }
     
     return res.status(500).json({ message: 'Error interno del servidor' });

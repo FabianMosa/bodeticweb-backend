@@ -1,4 +1,4 @@
-// backend/routes/categoria.routes.js
+
 import { Router } from 'express';
 import { getCategorias } from '../controllers/categoria.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';

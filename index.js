@@ -11,6 +11,7 @@ import movimientoRoutes from './routes/movimiento.routes.js';
 import usuarioRoutes from './routes/usuario.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import rolRoutes from './routes/rol.routes.js';
+import proveedoresRoutes from './routes/proveedor.routes.js';
 
 // --- AÑADIR ESTA LÍNEA ---
 // Cualquier petición que empiece con "/api/categorias" será manejada por categoriaRoutes
@@ -35,8 +36,12 @@ app.use('/api/movimientos', movimientoRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/roles', rolRoutes);
+app.use('/api/proveedores', proveedoresRoutes);
 
-// ...otras rutas...
+// Ruta de prueba
+app.get('/', (req, res) => {
+  res.send('API de BodeTIC funcionando 🚀');
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
