@@ -140,8 +140,40 @@ export const updateInsumo = async (req, res) => {
   }
 };
 
+// PUT (Cambiar estado activo/inactivo de un Insumo)
+export const toggleInsumoActivo = async (req, res) => {
+  const { id } = req.params;
+  
+  // El frontend enviará el estado opuesto
+  // Ej: Si está activo (1), enviará 'false' para desactivarlo (0)
+  const { nuevoEstado } = req.body; 
+
+  if (nuevoEstado === undefined || (nuevoEstado !== true && nuevoEstado !== false)) {
+    return res.status(400).json({ message: "Se requiere un 'nuevoEstado' (true/false)." });
+  }
+  
+  try {
+    const [result] = await pool.query(
+      'UPDATE INSUMO SET activo = ? WHERE PK_id_insumo = ?',
+      [nuevoEstado, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Insumo no encontrado' });
+    }
+
+    res.json({ 
+      message: `Insumo ${nuevoEstado ? 'habilitado' : 'deshabilitado'} con éxito.` 
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
 // DELETE (Eliminar un Insumo - desactivarlo)
-export const deleteInsumo = async (req, res) => {
+/*export const deleteInsumo = async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await pool.query(
@@ -158,4 +190,4 @@ export const deleteInsumo = async (req, res) => {
     console.error(error);
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
-};
+};*/

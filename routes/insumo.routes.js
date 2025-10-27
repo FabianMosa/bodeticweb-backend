@@ -5,8 +5,10 @@ import {
   getInsumos, 
   createInsumo,
   getInsumoById, 
-  updateInsumo  
+  updateInsumo,
+  toggleInsumoActivo  
 } from '../controllers/insumo.controller.js';
+
 
 
 const router = Router();
@@ -26,6 +28,8 @@ router.get('/:id', verifyToken, getInsumoById);
 // PUT /api/insumos/:id (Protegida por Admin)
 router.put('/:id', [verifyToken, isAdmin], updateInsumo);
 // DELETE /api/insumos/:id (Protegida por Admin)
+
+router.put('/:id', [verifyToken, isAdmin], toggleInsumoActivo);
 
 
 export default router;
