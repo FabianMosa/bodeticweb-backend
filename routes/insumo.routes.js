@@ -29,7 +29,7 @@ router.get('/:id', verifyToken, getInsumoById);
 router.put('/:id', [verifyToken, isAdmin], updateInsumo);
 // DELETE /api/insumos/:id (Protegida por Admin)
 
-router.put('/:id', [verifyToken, isAdmin], toggleInsumoActivo);
+router.put('/:id/toggle-activo', [verifyToken, isAdmin], toggleInsumoActivo);
 
 
 export default router;

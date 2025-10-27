@@ -1,24 +1,38 @@
-// backend/controllers/insumo.controller.js
+
 import { pool } from '../config/db.js';
 
 // GET (Leer todos los insumos)
 export const getInsumos = async (req, res) => {
+  // Obtenemos el filtro de la URL (query string)
+  const { activo } = req.query; // 'true' o 'false'
+
   try {
-    // Hacemos un JOIN para traer el nombre de la categoría (RF-07)
-    const [rows] = await pool.query(`
+    let query = `
       SELECT 
         i.PK_id_insumo, 
         i.nombre, 
         i.sku, 
         i.stock_actual, 
         i.stock_minimo,
-        c.nombre_categoria 
+        c.nombre_categoria,
+        i.activo          -- <-- 1. AÑADIR ESTE CAMPO
       FROM INSUMO i
       JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
-      WHERE i.activo = 1
-      ORDER BY i.nombre ASC
-    `);
+    `;
     
+    const queryParams = [];
+
+    // 2. AÑADIR FILTRO DINÁMICO
+    if (activo === 'true') {
+      query += ' WHERE i.activo = 1';
+    } else if (activo === 'false') {
+      query += ' WHERE i.activo = 0';
+    }
+    // Si 'activo' no se envía, trae TODOS (útil para el futuro)
+
+    query += ' ORDER BY i.nombre ASC';
+    
+    const [rows] = await pool.query(query, queryParams);
     res.json(rows);
   } catch (error) {
     console.error(error);
