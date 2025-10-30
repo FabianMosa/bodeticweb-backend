@@ -18,14 +18,17 @@ import proveedoresRoutes from './routes/proveedor.routes.js';
 
 const app = express();
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+const corsOptions = {
+  origin: FRONTEND_URL,
+  optionsSuccessStatus: 200 
+};
 // Middlewares
-app.use(cors()); 
+app.use(cors(corsOptions)); 
+
 app.use(express.json()); 
 
-// Rutas
-app.get('/', (req, res) => {
-  res.send('API de BodeTIC funcionando 🚀');
-});
 
 // --- AÑADIR ESTA LÍNEA ---
 // Cualquier petición que empiece con "/api/auth" será manejada por authRoutes
@@ -38,10 +41,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/roles', rolRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
 
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.send('API de BodeTIC funcionando 🚀');
-});
+// Iniciar el servidor
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
