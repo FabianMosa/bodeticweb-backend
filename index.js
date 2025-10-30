@@ -29,7 +29,11 @@ app.use(cors(corsOptions));
 
 app.use(express.json()); 
 
-
+// --- ✅ RUTA RAÍZ PARA TESTEO Y HEALTH CHECK ---
+app.get('/', (req, res) => {
+  res.send('API de BodeTIC (v1.0) funcionando 🚀');
+});
+// --- ✅ ASEGÚRATE DE TENER ESTO ---
 // --- AÑADIR ESTA LÍNEA ---
 // Cualquier petición que empiece con "/api/auth" será manejada por authRoutes
 app.use('/api/auth', authRoutes);
