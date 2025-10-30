@@ -13,7 +13,7 @@ export const login = async (req, res) => {
     }
 
     // 2. Buscar al usuario en la BD por su RUT
-    const [rows] = await pool.query('SELECT * FROM USUARIO WHERE rut = ?', [rut]);
+    const [rows] = await pool.query('SELECT * FROM USUARIO WHERE rut = ? AND activo = 1', [rut]);
 
     if (rows.length === 0) {
       // Si no hay filas, el usuario no existe
@@ -51,7 +51,7 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor-backend' });
+    console.error("Error en el login:", error);
+    return res.status(500).json({ message: 'Error interno del servidor-backend', error: error.message});
   }
 };
