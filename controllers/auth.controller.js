@@ -51,7 +51,7 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor-backend' });
+    console.error("Error en el login:", error);
+    return res.status(500).json({ message: 'Error interno del servidor-backend', error: error.message});
   }
 };
