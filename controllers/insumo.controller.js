@@ -15,7 +15,8 @@ export const getInsumos = async (req, res) => {
         i.stock_actual, 
         i.stock_minimo,
         c.nombre_categoria,
-        i.activo          -- <-- 1. AÑADIR ESTE CAMPO
+        i.activo,
+        i.FK_id_categoria          
       FROM INSUMO i
       JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
     `;
