@@ -3,7 +3,6 @@ import { pool } from '../config/db.js';
 
 // GET (Leer todos los insumos)
 export const getInsumos = async (req, res) => {
-  // Obtenemos el filtro de la URL (query string)
   const { activo } = req.query; // 'true' o 'false'
 
   try {
@@ -15,7 +14,7 @@ export const getInsumos = async (req, res) => {
         i.stock_actual, 
         i.stock_minimo,
         c.nombre_categoria,
-        i.activo,
+        i.activo, -- ¡MUY IMPORTANTE!
         i.FK_id_categoria          
       FROM INSUMO i
       JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
@@ -23,14 +22,15 @@ export const getInsumos = async (req, res) => {
     
     const queryParams = [];
 
-    // 2. AÑADIR FILTRO DINÁMICO
+    // 1. ESTA ES LA CORRECCIÓN
+    // Si el filtro 'activo' se especifica, se usa.
+    // Si no se especifica, no se añade el WHERE (trayendo TODOS).
     if (activo === 'true') {
       query += ' WHERE i.activo = 1';
     } else if (activo === 'false') {
       query += ' WHERE i.activo = 0';
     }
-    // Si 'activo' no se envía, trae TODOS (útil para el futuro)
-
+    
     query += ' ORDER BY i.nombre ASC';
     
     const [rows] = await pool.query(query, queryParams);
