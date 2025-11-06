@@ -220,7 +220,7 @@ export const getPrestamosActivos = async (req, res) => {
   }
 };
 
-export const getHistorialMovimientos = async (req, res) => {
+/*export const getHistorialMovimientos = async (req, res) => {
   // Obtenemos los filtros de la URL (query string)
   const { 
     fecha_inicio, 
@@ -228,9 +228,13 @@ export const getHistorialMovimientos = async (req, res) => {
     id_insumo, 
     id_usuario, 
     tipo_movimiento,
-    formato // 'json' o 'excel'
+    formato,
+    age = 1, 
+    limit = 5
   } = req.query;
 
+  const offset = (page - 1) * limit; // Calcular el 'desde dónde'
+  const limitNumeric = parseInt(limit, 10);
   try {
     // --- 1. Construcción de la Consulta Dinámica ---
     let query = `
@@ -325,5 +329,136 @@ export const getHistorialMovimientos = async (req, res) => {
     console.error(error);
     return res.status(500).json({ message: error.message || 'Error interno del servidor' });
   }
-};
+};*/
 
+// backend/controllers/movimiento.controller.js
+export const getHistorialMovimientos = async (req, res) => {
+  const { 
+    fecha_inicio, fecha_fin, id_insumo, id_usuario, tipo_movimiento,
+    formato,
+    page = 1,
+    limit = 10 // (Ajusta esto a tu ITEMS_PER_PAGE del frontend)
+  } = req.query;
+
+  try {
+    // --- 1. Construcción de la Consulta Dinámica (Base) ---
+    let queryBase = `
+      FROM MOVIMIENTO m
+      JOIN INSUMO i ON m.FK_id_insumo = i.PK_id_insumo
+      JOIN USUARIO u ON m.FK_id_usuario = u.PK_id_usuario
+      LEFT JOIN HOJA_TERRENO ot ON m.FK_id_ot = ot.PK_id_ot
+      LEFT JOIN DOCUMENTO_INGRESO doc ON m.FK_id_documento = doc.PK_id_documento
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+
+    if (fecha_inicio) {
+      queryBase += ' AND DATE(m.fecha_hora) >= ?';
+      queryParams.push(fecha_inicio);
+    }
+    if (fecha_fin) {
+      queryBase += ' AND DATE(m.fecha_hora) <= ?';
+      queryParams.push(fecha_fin);
+    }
+    if (id_insumo) {
+      queryBase += ' AND m.FK_id_insumo = ?';
+      queryParams.push(id_insumo);
+    }
+    if (id_usuario) {
+      queryBase += ' AND m.FK_id_usuario = ?';
+      queryParams.push(id_usuario);
+    }
+    if (tipo_movimiento) {
+      queryBase += ' AND m.tipo_movimiento = ?';
+      queryParams.push(tipo_movimiento);
+    }
+
+    // --- 2. Decidir el formato de respuesta ---
+    
+    if (formato === 'excel') {
+      // --- RESPUESTA COMO EXCEL (RF-08) ---
+      
+      // 1. Ejecutar la consulta SIN paginación
+      const [rows] = await pool.query(
+        `SELECT 
+           m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
+           i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
+           ot.codigo_ot, doc.codigo_documento
+         ${queryBase} 
+         ORDER BY m.fecha_hora DESC`,
+        queryParams
+      );
+
+      // 2. Generar el libro Excel
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'BodeTICWeb';
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet('Historial de Movimientos');
+
+      worksheet.columns = [
+        { header: 'ID', key: 'PK_id_movimiento', width: 10 },
+        { header: 'Fecha y Hora', key: 'fecha_hora', width: 25 },
+        { header: 'Tipo', key: 'tipo_movimiento', width: 15 },
+        { header: 'Insumo', key: 'nombre_insumo', width: 30 },
+        { header: 'Cantidad', key: 'cantidad', width: 10 },
+        { header: 'Usuario', key: 'nombre_usuario', width: 25 },
+        { header: 'OT', key: 'codigo_ot', width: 15 },
+        { header: 'Documento', key: 'codigo_documento', width: 15 },
+      ];
+      worksheet.addRows(rows);
+      
+      // 3. Enviar el archivo al cliente
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="Reporte_BodeTIC.xlsx"'
+      );
+      
+      await workbook.xlsx.write(res);
+      res.end(); // Finalizar la respuesta
+
+    } else {
+      // --- RESPUESTA COMO JSON (PAGINADA) ---
+      const offset = (page - 1) * limit;
+      const limitNumeric = parseInt(limit, 10);
+
+      // Consulta 1: Contar total de items (con filtros)
+      const [countRows] = await pool.query(
+        `SELECT COUNT(*) as totalItems ${queryBase}`, 
+        queryParams
+      );
+      const totalItems = countRows[0].totalItems;
+      const totalPages = Math.ceil(totalItems / limitNumeric);
+
+      // Consulta 2: Obtener los datos de la página actual
+      const [dataRows] = await pool.query(
+        `SELECT 
+           m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
+           i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
+           ot.codigo_ot, doc.codigo_documento
+         ${queryBase}
+         ORDER BY m.fecha_hora DESC
+         LIMIT ? OFFSET ?`,
+        [...queryParams, limitNumeric, offset]
+      );
+      
+      res.json({
+        data: dataRows,
+        pagination: {
+          currentPage: parseInt(page, 10),
+          totalPages: totalPages,
+          totalItems: totalItems
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error("Error en getHistorialMovimientos:", error);
+    // Enviar un error JSON sin importar el formato pedido
+    res.status(500).json({ message: error.message || 'Error interno del servidor' });
+  }
+};
