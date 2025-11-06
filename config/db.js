@@ -2,6 +2,7 @@
 import mysql from 'mysql2/promise';
 import 'dotenv/config'; // Carga las variables del .env
 
+
 // Determina las variables correctas (Producción en Railway vs. Desarrollo Local)
 const dbHost = process.env.DB_HOST || process.env.MYSQLHOST;
 const dbUser = process.env.DB_USER || process.env.MYSQLUSER;
