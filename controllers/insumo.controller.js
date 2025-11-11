@@ -3,38 +3,78 @@ import { pool } from '../config/db.js';
 
 // GET (Leer todos los insumos)
 export const getInsumos = async (req, res) => {
-  const { activo } = req.query; // 'true' o 'false'
+  const { 
+    activo = 'true', // Por defecto, solo trae activos
+    categoria = '',
+    search = '', 
+    page = 1,
+    limit = 5 // (Asegúrarse que coincida con frontend)
+  } = req.query;
+
+  const offset = (page - 1) * limit;
+  const limitNumeric = parseInt(limit, 10);
 
   try {
-    let query = `
-      SELECT 
-        i.PK_id_insumo, 
-        i.nombre, 
-        i.sku, 
-        i.stock_actual, 
-        i.stock_minimo,
-        c.nombre_categoria,
-        i.activo, -- ¡MUY IMPORTANTE!
-        i.FK_id_categoria          
+    let queryParams = [];
+    
+    // ---'''''''''''''''''''''''''''''''''''''''CONSTRUCCIÓN DE LA CONSULTA BASE ---
+    let queryBase = `
       FROM INSUMO i
       JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
+      WHERE 1=1
     `;
-    
-    const queryParams = [];
 
-    // 1. ESTA ES LA CORRECCIÓN
-    // Si el filtro 'activo' se especifica, se usa.
-    // Si no se especifica, no se añade el WHERE (trayendo TODOS).
+    //''''''''''''''''''''''''''''''''''''''''''''' Filtro de Activo (true/false)
     if (activo === 'true') {
-      query += ' WHERE i.activo = 1';
+      queryBase += ' AND i.activo = 1';
     } else if (activo === 'false') {
-      query += ' WHERE i.activo = 0';
+      queryBase += ' AND i.activo = 0';
     }
-    
-    query += ' ORDER BY i.nombre ASC';
-    
-    const [rows] = await pool.query(query, queryParams);
-    res.json(rows);
+
+    //''''''''''''''''''''''''''''''''''''''''''''''''''''''' Filtro de Categoría
+    if (categoria) {
+      queryBase += ' AND i.FK_id_categoria = ?';
+      queryParams.push(categoria);
+    }
+
+    // ----------------------------------------------------------- NUEVO FILTRO DE BÚSQUEDA POR NOMBRE ---
+    if (search) {
+      queryBase += ' AND i.nombre LIKE ?';
+      queryParams.push(`%${search}%`); // Busca coincidencias parciales
+    }
+
+    // -----------------------------------------------------------CONSULTA 1: Contar el total de items (con filtros) ---
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) as totalItems ${queryBase}`,
+      queryParams
+    );
+    const totalItems = countRows[0].totalItems;
+    const totalPages = Math.ceil(totalItems / limitNumeric);
+
+    // -----------------------------------------------------------CONSULTA 2: Obtener los datos de la página actual ---
+    const [dataRows] = await pool.query(
+      `SELECT 
+        i.PK_id_insumo, i.nombre, i.sku, 
+        i.stock_actual, i.stock_minimo,
+        c.nombre_categoria,
+        i.activo,
+        i.FK_id_categoria          
+      ${queryBase}
+      ORDER BY i.nombre ASC
+      LIMIT ? OFFSET ?`,
+      [...queryParams, limitNumeric, offset] // Añadir limit y offset
+    );
+
+    // --------------------------------------------------------Devolver la respuesta paginada ---
+    res.json({
+      data: dataRows,
+      pagination: {
+        currentPage: parseInt(page, 10),
+        totalPages: totalPages,
+        totalItems: totalItems
+      }
+    });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Error interno del servidor' });
@@ -128,7 +168,6 @@ export const getInsumoById = async (req, res) => {
   }
 };
 
-// --- AÑADIR ESTA NUEVA FUNCIÓN ---
 // PUT (Actualizar un Insumo)
 export const updateInsumo = async (req, res) => {
   const { id } = req.params;

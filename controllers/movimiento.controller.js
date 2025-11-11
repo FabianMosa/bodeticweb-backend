@@ -341,7 +341,7 @@ export const getPrestamosActivos = async (req, res) => {
 // backend/controllers/movimiento.controller.js
 export const getHistorialMovimientos = async (req, res) => {
   const { 
-    fecha_inicio, fecha_fin, id_insumo, id_usuario, tipo_movimiento,
+    fecha_inicio, fecha_fin, id_categoria, id_usuario, tipo_movimiento,
     formato,
     page = 1,
     limit = 10 // (Ajusta esto a tu ITEMS_PER_PAGE del frontend)
@@ -368,9 +368,9 @@ export const getHistorialMovimientos = async (req, res) => {
       queryBase += ' AND DATE(m.fecha_hora) <= ?';
       queryParams.push(fecha_fin);
     }
-    if (id_insumo) {
-      queryBase += ' AND m.FK_id_insumo = ?';
-      queryParams.push(id_insumo);
+    if (id_categoria) {
+      queryBase += ' AND i.FK_id_categoria = ?';
+      queryParams.push(id_categoria);
     }
     if (id_usuario) {
       queryBase += ' AND m.FK_id_usuario = ?';
