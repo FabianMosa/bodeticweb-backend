@@ -133,7 +133,12 @@ export const createInsumo = async (req, res) => {
 
     // Si todo va bien
     await connection.commit();
-    res.status(201).json({ message: 'Insumo creado y asociado al documento con éxito', id: nuevoInsumoId });
+
+    res.status(201).json({ 
+      message: 'Insumo creado y asociado al documento con éxito', 
+      id: nuevoInsumoId,
+      documentoId: finalDocumentoId
+    });
 
   // --- 1. ESTE ES EL BLOQUE CORREGIDO ---
   } catch (error) {

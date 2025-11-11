@@ -4,7 +4,8 @@ import { getUsuarios,
     getAllUsuarios,
     getUsuarioById,
     createUsuario,
-    updateUsuario } from '../controllers/usuario.controller.js';
+    updateUsuario,
+changePasswordAdmin } from '../controllers/usuario.controller.js';
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -27,6 +28,8 @@ router.post('/', [verifyToken, isAdmin], createUsuario);
 // PUT /api/usuarios/:id (Actualizar uno)
 router.put('/:id', [verifyToken, isAdmin], updateUsuario);
 
+// PUT /api/usuarios/:id/password (Cambiar contraseña de uno)
+router.put('/:id/change-password', [verifyToken, isAdmin], changePasswordAdmin);
 // DELETE /api/usuarios/:id (Eliminar uno)
 //router.delete('/:id', [verifyToken, isAdmin], deleteUsuario);  
 
