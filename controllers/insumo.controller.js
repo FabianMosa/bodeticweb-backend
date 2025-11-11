@@ -8,7 +8,7 @@ export const getInsumos = async (req, res) => {
     categoria = '',
     search = '', 
     page = 1,
-    limit = 5 // (Asegúrarse que coincida con frontend)
+    limit = 9 // (Asegúrarse que coincida con frontend)
   } = req.query;
 
   const offset = (page - 1) * limit;
@@ -140,7 +140,7 @@ export const createInsumo = async (req, res) => {
       documentoId: finalDocumentoId
     });
 
-  // --- 1. ESTE ES EL BLOQUE CORREGIDO ---
+  // -------------------------------------------------------------------ESTE ES EL BLOQUE CORREGIDO ---
   } catch (error) {
     if (connection) await connection.rollback(); // Revertir en caso de error
     console.error("Error en createInsumo:", error);
