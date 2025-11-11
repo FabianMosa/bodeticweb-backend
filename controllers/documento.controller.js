@@ -1,12 +1,10 @@
-
 import { pool } from '../config/db.js';
 
-// ----------------------------------------------GET (Buscar un documento por su código)
+// GET (Buscar un documento por su código)
 export const getDocumentoByCodigo = async (req, res) => {
   const { codigo } = req.params;
   try {
     const [rows] = await pool.query(
-      //--------------------------------------- Hacemos JOIN con Proveedor para devolver el nombre
       `SELECT d.PK_id_documento, d.codigo_documento, d.fecha_emision, d.FK_id_proveedor, p.nombre_proveedor
        FROM DOCUMENTO_INGRESO d
        JOIN PROVEEDOR p ON d.FK_id_proveedor = p.PK_id_proveedor
@@ -20,7 +18,7 @@ export const getDocumentoByCodigo = async (req, res) => {
     
     res.json(rows[0]); // Devolvemos el documento encontrado
   } catch (error) {
-    console.error(error);
+    console.error("Error en getDocumentoByCodigo:", error);
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
