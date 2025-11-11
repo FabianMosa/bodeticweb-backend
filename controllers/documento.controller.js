@@ -1,6 +1,6 @@
 import { pool } from '../config/db.js';
 
-// GET (Buscar un documento por su código para el formulario)
+// GET (Buscar un documento por su código)
 export const getDocumentoByCodigo = async (req, res) => {
   const { codigo } = req.params;
   try {
