@@ -111,3 +111,35 @@ export const updateUsuario = async (req, res) => {
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
+
+// PUT (Admin cambia la contraseña de un usuario)
+export const changePasswordAdmin = async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  // Validación
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+  }
+
+  try {
+    // Encriptar la nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(newPassword, salt);
+
+    const [result] = await pool.query(
+      'UPDATE USUARIO SET password_hash = ? WHERE PK_id_usuario = ?',
+      [password_hash, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    res.json({ message: 'Contraseña actualizada con éxito' });
+
+  } catch (error) {
+    console.error("Error en changePasswordAdmin:", error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
