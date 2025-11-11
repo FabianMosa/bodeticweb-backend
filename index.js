@@ -12,7 +12,7 @@ import usuarioRoutes from './routes/usuario.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import rolRoutes from './routes/rol.routes.js';
 import proveedoresRoutes from './routes/proveedor.routes.js';
-
+import documentoRoutes from './routes/documento.routes.js';
 // --- AÑADIR ESTA LÍNEA ---
 // Cualquier petición que empiece con "/api/categorias" será manejada por categoriaRoutes
 
@@ -44,6 +44,9 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/roles', rolRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
+app.use('/api/documentos', documentoRoutes);
+// --- AÑADIR ESTA LÍNEA ---
+// Cualquier petición que empiece con "/api/categorias" será manejada por categoriaRoutes
 
 // Iniciar el servidor
 

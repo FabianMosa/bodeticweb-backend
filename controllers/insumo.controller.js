@@ -1,7 +1,7 @@
 
 import { pool } from '../config/db.js';
 
-// GET (Leer todos los insumos)
+//---------------------------------------------------------- GET (Leer todos los insumos)
 export const getInsumos = async (req, res) => {
   const { 
     activo = 'true', // Por defecto, solo trae activos
@@ -81,71 +81,73 @@ export const getInsumos = async (req, res) => {
   }
 };
 
-// (Aquí añadiremos después: POST, PUT, DELETE)
 // POST (Crear un Insumo)
 export const createInsumo = async (req, res) => {
-  // Obtenemos los datos del formulario
-  const { nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento,
-    id_proveedor,codigo_documento,fecha_emision
-   } = req.body;
+  const { 
+    nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento,
+    id_documento_existente,
+    id_proveedor,          
+    codigo_documento,   
+    fecha_emision       
+  } = req.body;
   
-  // Obtenemos el ID del admin que está haciendo la operación (gracias al middleware)
   const id_usuario_admin = req.usuario.id;
 
-  // Iniciamos una conexión 'cliente' para manejar la transacción
   let connection;
   try {
-    connection = await pool.getConnection(); // Pedimos una conexión del pool
-    await connection.beginTransaction(); // ¡Iniciamos la transacción!
+    connection = await pool.getConnection(); 
+    await connection.beginTransaction(); // Iniciar Transacción
 
-    // Insertar el Documento de Ingreso
-    const [docResult] = await connection.query(
-      `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
-       VALUES (?, ?, ?)`,
-      [id_proveedor, codigo_documento, fecha_emision]
-    );
-    const newDocumentoId = docResult.insertId;
+    let finalDocumentoId;
 
-    // Insertar el Insumo en la tabla INSUMO
+    // Lógica "Buscar o Crear" Documento
+    if (id_documento_existente) {
+      finalDocumentoId = id_documento_existente;
+    } else {
+      // Crear un NUEVO documento
+      if (!id_proveedor || !codigo_documento || !fecha_emision) {
+        throw new Error('Proveedor, N° de Documento y Fecha son requeridos para un nuevo documento.');
+      }
+      const [docResult] = await connection.query(
+        `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
+         VALUES (?, ?, ?)`,
+        [id_proveedor, codigo_documento, fecha_emision]
+      );
+      finalDocumentoId = docResult.insertId;
+    }
+
+    // Insertar el Insumo
     const [insumoResult] = await connection.query(
       `INSERT INTO INSUMO (nombre, sku, descripcion, stock_actual, stock_minimo, FK_id_categoria, fecha_vencimiento, activo) 
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      [nombre, sku, descripcion, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento || null]
+      [nombre, sku, descripcion || null, stock_inicial, stock_minimo, id_categoria, fecha_vencimiento || null]
     );
-
     const nuevoInsumoId = insumoResult.insertId;
-    //Insertar el Movimiento de 'Entrada' vinculado al Documento
-await connection.query(
+
+    // Insertar el Movimiento de 'Entrada'
+    await connection.query(
       `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora, FK_id_documento) 
        VALUES (?, ?, 'Entrada', ?, NOW(), ?)`,
-      [nuevoInsumoId, id_usuario_admin, stock_inicial, newDocumentoId] // <-- ID del documento añadido
+      [nuevoInsumoId, id_usuario_admin, stock_inicial, finalDocumentoId]
     );
-    
 
-    // confirmamos la transacción
+    // Si todo va bien
     await connection.commit();
+    res.status(201).json({ message: 'Insumo creado y asociado al documento con éxito', id: nuevoInsumoId });
 
-    res.status(201).json({ message: 'Insumo y documento creados con éxito', id: nuevoInsumoId });
-
+  // --- 1. ESTE ES EL BLOQUE CORREGIDO ---
   } catch (error) {
-    // 4. Si algo falló, revertimos la transacción
-    if (connection) {
-      await connection.rollback();
-    }
-    console.error(error);
-    
-    // Error común: SKU duplicado
+    if (connection) await connection.rollback(); // Revertir en caso de error
+    console.error("Error en createInsumo:", error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'El SKU, Nombre o Número de Nombre ingresado ya existe.' });
+      return res.status(400).json({ message: 'El SKU, Nombre o N° de Documento ya existe.' });
     }
-    
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    // Devolver el mensaje de error específico (ej. "Proveedor... es requerido")
+    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
   } finally {
-    // 5. Siempre liberamos la conexión al final
-    if (connection) {
-      connection.release();
-    }
+    if (connection) connection.release(); // Liberar la conexión
   }
+  // --- FIN DE LA CORRECIÓN ---
 };
 
 // GET (Leer UN insumo por ID)
