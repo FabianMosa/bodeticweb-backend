@@ -159,7 +159,7 @@ export const createInsumo = async (req, res) => {
     if (connection) await connection.rollback(); // Revertir en caso de error
     console.error("Error en createInsumo:", error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'El SKU, Nombre o N° de Documento ya existe.' });
+      return res.status(400).json({ message: 'El SKU o Nombre ya existe.' });
     }
     // Devolver el mensaje de error específico (ej. "Proveedor... es requerido")
     return res.status(500).json({ message: error.message || 'Error interno del servidor' });
@@ -276,7 +276,7 @@ export const getInsumoBySku = async (req, res) => {
   }
 };
 
-// DELETE (Eliminar un Insumo - desactivarlo)
+// DELETE (Eliminar un Insumo - desactivado)
 /*export const deleteInsumo = async (req, res) => {
   const { id } = req.params;
   try {
