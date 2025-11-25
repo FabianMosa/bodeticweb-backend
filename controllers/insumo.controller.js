@@ -8,7 +8,7 @@ export const getInsumos = async (req, res) => {
     categoria = '',
     search = '', 
     page = 1,
-    limit = 5 // (Asegúrarse que coincida con frontend)
+    limit = 9 // (Asegúrarse que coincida con frontend)
   } = req.query;
 
   const offset = (page - 1) * limit;
@@ -102,18 +102,32 @@ export const createInsumo = async (req, res) => {
 
     // Lógica "Buscar o Crear" Documento
     if (id_documento_existente) {
+      // CASO A: El frontend ya nos dio el ID (el usuario usó el botón "Buscar")
       finalDocumentoId = id_documento_existente;
     } else {
-      // Crear un NUEVO documento
+      // CASO B: No tenemos ID. Puede ser nuevo o el usuario no buscó.
       if (!id_proveedor || !codigo_documento || !fecha_emision) {
-        throw new Error('Proveedor, N° de Documento y Fecha son requeridos para un nuevo documento.');
+        throw new Error('Proveedor, N° de Documento y Fecha son requeridos.');
       }
-      const [docResult] = await connection.query(
-        `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
-         VALUES (?, ?, ?)`,
-        [id_proveedor, codigo_documento, fecha_emision]
+
+      // 1.1 Verificar si el documento YA EXISTE en la BBDD antes de insertar
+      const [existingDocs] = await connection.query(
+        'SELECT PK_id_documento FROM DOCUMENTO_INGRESO WHERE codigo_documento = ?',
+        [codigo_documento]
       );
-      finalDocumentoId = docResult.insertId;
+
+      if (existingDocs.length > 0) {
+        // Usamos el ID existente y evitamos el error de duplicado
+        finalDocumentoId = existingDocs[0].PK_id_documento;
+      } else {
+        // NO EXISTE: Creamos uno nuevo
+        const [docResult] = await connection.query(
+          `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
+           VALUES (?, ?, ?)`,
+          [id_proveedor, codigo_documento, fecha_emision]
+        );
+        finalDocumentoId = docResult.insertId;
+      }
     }
 
     // Insertar el Insumo
@@ -131,7 +145,7 @@ export const createInsumo = async (req, res) => {
       [nuevoInsumoId, id_usuario_admin, stock_inicial, finalDocumentoId]
     );
 
-    // Si todo va bien
+    // Confirmar la transacción
     await connection.commit();
 
     res.status(201).json({ 
@@ -140,7 +154,7 @@ export const createInsumo = async (req, res) => {
       documentoId: finalDocumentoId
     });
 
-  // --- 1. ESTE ES EL BLOQUE CORREGIDO ---
+  // --- Manejo de errores y rollback ---
   } catch (error) {
     if (connection) await connection.rollback(); // Revertir en caso de error
     console.error("Error en createInsumo:", error);
@@ -151,8 +165,7 @@ export const createInsumo = async (req, res) => {
     return res.status(500).json({ message: error.message || 'Error interno del servidor' });
   } finally {
     if (connection) connection.release(); // Liberar la conexión
-  }
-  // --- FIN DE LA CORRECIÓN ---
+  }  
 };
 
 // GET (Leer UN insumo por ID)
