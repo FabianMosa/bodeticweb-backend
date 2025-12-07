@@ -1,5 +1,4 @@
-
-import { pool } from '../config/db.js';
+import { pool } from "../config/db.js";
 
 // GET (Obtener todas las alertas para el dashboard)
 export const getAlertas = async (req, res) => {
@@ -25,12 +24,10 @@ export const getAlertas = async (req, res) => {
 
     res.json({
       stockBajo,
-      porVencer
+      porVencer,
     });
-
-  } catch (error)
- {
+  } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };

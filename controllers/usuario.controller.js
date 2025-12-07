@@ -1,6 +1,5 @@
-
-import { pool } from '../config/db.js';
-import bcrypt from 'bcryptjs';
+import { pool } from "../config/db.js";
+import bcrypt from "bcryptjs";
 
 // GET (Leer todos los usuarios, especialmente Técnicos)
 export const getUsuarios = async (req, res) => {
@@ -15,7 +14,7 @@ export const getUsuarios = async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -31,7 +30,7 @@ export const getAllUsuarios = async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 // GET (Obtener UN usuario por ID - para el formulario de Editar)
@@ -45,12 +44,12 @@ export const getUsuarioById = async (req, res) => {
       [id]
     );
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
     res.json(rows[0]);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -59,7 +58,7 @@ export const createUsuario = async (req, res) => {
   const { nombre, rut, password, id_rol } = req.body;
 
   if (!nombre || !rut || !password || !id_rol) {
-    return res.status(400).json({ message: 'Todos los campos son requeridos' });
+    return res.status(400).json({ message: "Todos los campos son requeridos" });
   }
 
   try {
@@ -73,13 +72,15 @@ export const createUsuario = async (req, res) => {
       [nombre, rut, password_hash, id_rol]
     );
 
-    res.status(201).json({ message: 'Usuario creado con éxito', id: result.insertId });
+    res
+      .status(201)
+      .json({ message: "Usuario creado con éxito", id: result.insertId });
   } catch (error) {
     console.error(error);
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'El RUT ingresado ya existe' });
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ message: "El RUT ingresado ya existe" });
     }
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -100,15 +101,15 @@ export const updateUsuario = async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
-    res.json({ message: 'Usuario actualizado con éxito' });
+    res.json({ message: "Usuario actualizado con éxito" });
   } catch (error) {
     console.error(error);
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'El RUT ingresado ya existe' });
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ message: "El RUT ingresado ya existe" });
     }
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -119,7 +120,9 @@ export const changePasswordAdmin = async (req, res) => {
 
   // Validación
   if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    return res
+      .status(400)
+      .json({ message: "La contraseña debe tener al menos 6 caracteres" });
   }
 
   try {
@@ -128,18 +131,17 @@ export const changePasswordAdmin = async (req, res) => {
     const password_hash = await bcrypt.hash(newPassword, salt);
 
     const [result] = await pool.query(
-      'UPDATE USUARIO SET password_hash = ? WHERE PK_id_usuario = ?',
+      "UPDATE USUARIO SET password_hash = ? WHERE PK_id_usuario = ?",
       [password_hash, id]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    res.json({ message: 'Contraseña actualizada con éxito' });
-
+    res.json({ message: "Contraseña actualizada con éxito" });
   } catch (error) {
     console.error("Error en changePasswordAdmin:", error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };

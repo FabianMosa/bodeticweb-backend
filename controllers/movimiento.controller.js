@@ -1,128 +1,128 @@
-
-import { pool } from '../config/db.js';
-import ExcelJS from 'exceljs';
+import { pool } from "../config/db.js";
+import ExcelJS from "exceljs";
 
 // -------------------------------------------POST (Registrar una Salida, sea Uso o Préstamo)
 // POST (Registrar una Salida, sea Uso o Préstamo)
 export const registrarSalida = async (req, res) => {
-  // Recibes la descripción (Esto está OK)
-  const { id_insumo, cantidad, tipo_movimiento, codigo_ot, descripcion } = req.body;
-  
-  const id_usuario = req.usuario.id; 
+  // Recibes la descripción (Esto está OK)
+  const { id_insumo, cantidad, tipo_movimiento, codigo_ot, descripcion } =
+    req.body;
+  const id_usuario = req.usuario.id; // ------------------------------------------------------(Validaciones - sin cambios)
 
-  // ------------------------------------------------------(Validaciones - sin cambios)
-  if (!id_insumo || !cantidad || !tipo_movimiento) {
-    return res.status(400).json({ message: 'Insumo, Cantidad y Tipo son requeridos' });
-  }
-  if (tipo_movimiento === 'Salida-Uso' && !codigo_ot) {
-    return res.status(400).json({ message: 'El N° de OT es requerido para una "Salida-Uso"' });
-  }
-  if (cantidad <= 0) {
-    return res.status(400).json({ message: 'La cantidad debe ser mayor a cero' });
-  }
-  if (tipo_movimiento !== 'Salida-Uso' && tipo_movimiento !== 'Préstamo') {
-    return res.status(400).json({ message: 'Tipo de movimiento no válido' });
-  }
+  if (!id_insumo || !cantidad || !tipo_movimiento) {
+    return res
+      .status(400)
+      .json({ message: "Insumo, Cantidad y Tipo son requeridos" });
+  }
+  if (tipo_movimiento === "Salida-Uso" && !codigo_ot) {
+    return res
+      .status(400)
+      .json({ message: 'El N° de OT es requerido para una "Salida-Uso"' });
+  }
+  if (cantidad <= 0) {
+    return res
+      .status(400)
+      .json({ message: "La cantidad debe ser mayor a cero" });
+  }
+  if (tipo_movimiento !== "Salida-Uso" && tipo_movimiento !== "Préstamo") {
+    return res.status(400).json({ message: "Tipo de movimiento no válido" });
+  }
 
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction(); // -----------------------------------------------Verificar y Bloquear Insumo ----
 
-    // -----------------------------------------------Verificar y Bloquear Insumo ----
-    const [insumoRows] = await connection.query(
-      'SELECT stock_actual FROM INSUMO WHERE PK_id_insumo = ? FOR UPDATE',
-      [id_insumo]
-    );
-    if (insumoRows.length === 0) {
-      throw new Error('Insumo no encontrado');
-    }
-    const stock_actual = insumoRows[0].stock_actual;
+    const [insumoRows] = await connection.query(
+      "SELECT stock_actual FROM INSUMO WHERE PK_id_insumo = ? FOR UPDATE",
+      [id_insumo]
+    );
+    if (insumoRows.length === 0) {
+      throw new Error("Insumo no encontrado");
+    }
+    const stock_actual = insumoRows[0].stock_actual; // ------------------------------------------------------ Validar Stock ----
 
-    // ------------------------------------------------------ Validar Stock ----
-    if (stock_actual < cantidad) {
-      throw new Error(`Stock insuficiente. Stock actual: ${stock_actual}`);
-    }
+    if (stock_actual < cantidad) {
+      throw new Error(`Stock insuficiente. Stock actual: ${stock_actual}`);
+    } // -------------------------------------------------Gestionar la Hoja de Terreno (OT) (Condicional) ----
 
-    // -------------------------------------------------Gestionar la Hoja de Terreno (OT) (Condicional) ----
-    let id_ot = null; // Por defecto, la OT es NULL
-    
-    // Solo buscamos o creamos una OT si el 'codigo_ot' fue proporcionado
-    if (codigo_ot) {
-      const [otRows] = await connection.query(
-        'SELECT PK_id_ot FROM HOJA_TERRENO WHERE codigo_ot = ?',
-        [codigo_ot]
-      );
+    let id_ot = null; // Por defecto, la OT es NULL // Solo buscamos o creamos una OT si el 'codigo_ot' fue proporcionado
+    if (codigo_ot) {
+      const [otRows] = await connection.query(
+        "SELECT PK_id_ot FROM HOJA_TERRENO WHERE codigo_ot = ?",
+        [codigo_ot]
+      );
 
-      if (otRows.length > 0) {
-        id_ot = otRows[0].PK_id_ot; // Usar OT existente
-      } else {
-        // Crear nueva OT
-        const [newOtResult] = await connection.query(
-          'INSERT INTO HOJA_TERRENO (codigo_ot, fecha) VALUES (?, CURDATE())',
-          [codigo_ot]
-        );
-        id_ot = newOtResult.insertId;
-      }
-    }
-  
-    // ---- INICIO DEL BLOQUE ELIMINADO ----
-    // const [otRows] = await connection.query( ... );
-    // if (otRows.length > 0) { ... }
-    // else { ... }
-    // ---- FIN DEL BLOQUE ELIMINADO ----
+      if (otRows.length > 0) {
+        id_ot = otRows[0].PK_id_ot; // Usar OT existente
+      } else {
+        // Crear nueva OT
+        const [newOtResult] = await connection.query(
+          "INSERT INTO HOJA_TERRENO (codigo_ot, fecha) VALUES (?, CURDATE())",
+          [codigo_ot]
+        );
+        id_ot = newOtResult.insertId;
+      }
+    } // ---- INICIO DEL BLOQUE ELIMINADO ---- // const [otRows] = await connection.query( ... ); // if (otRows.length > 0) { ... } // else { ... } // ---- FIN DEL BLOQUE ELIMINADO ---- // -------------------------------------------------Actualizar el Stock del Insumo ----
+    const nuevo_stock = stock_actual - cantidad;
+    await connection.query(
+      "UPDATE INSUMO SET stock_actual = ? WHERE PK_id_insumo = ?",
+      [nuevo_stock, id_insumo]
+    ); // ------------------------------------------------Registrar el Movimiento (Corregido) ----
 
-    // -------------------------------------------------Actualizar el Stock del Insumo ----
-    const nuevo_stock = stock_actual - cantidad;
-    await connection.query(
-      'UPDATE INSUMO SET stock_actual = ? WHERE PK_id_insumo = ?',
-      [nuevo_stock, id_insumo]
-    );
-
-    // ------------------------------------------------Registrar el Movimiento (Corregido) ----
-    await connection.query(
+    await connection.query(
       `INSERT INTO MOVIMIENTO 
        (FK_id_insumo, FK_id_usuario, FK_id_ot, tipo_movimiento, cantidad, descripcion, fecha_hora)
        VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [id_insumo, id_usuario, id_ot, tipo_movimiento, cantidad, descripcion || null]
-    );
+      [
+        id_insumo,
+        id_usuario,
+        id_ot,
+        tipo_movimiento,
+        cantidad,
+        descripcion || null,
+      ]
+    ); // --------------------------------------------------¡ÉXITO! Confirmar la transacción ----
 
-    // --------------------------------------------------¡ÉXITO! Confirmar la transacción ----
-    await connection.commit();
-    
-    res.status(201).json({ 
-      message: `${tipo_movimiento} registrado con éxito.`,
-      nuevo_stock: nuevo_stock
-    });
-
-  } catch (error) {
-    // (catch - sin cambios) ...
-    if (connection) {
-      await connection.rollback();
-    }
-    console.error(error);
-    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
-  } finally {
-    // (finally - sin cambios) ...
-    if (connection) {
-      connection.release();
-    }
-  }
+    await connection.commit();
+    res.status(201).json({
+      message: `${tipo_movimiento} registrado con éxito.`,
+      nuevo_stock: nuevo_stock,
+    });
+  } catch (error) {
+    // (catch - sin cambios) ...
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: error.message || "Error interno del servidor" });
+  } finally {
+    // (finally - sin cambios) ...
+    if (connection) {
+      connection.release();
+    }
+  }
 };
 
 // POST (Registrar una Devolución de un Préstamo)
 export const registrarDevolucion = async (req, res) => {
   // Datos que envía el Admin
   const { id_insumo, cantidad_devuelta, id_usuario_tecnico } = req.body;
-  
+
   // El ID del Admin que registra la devolución
-  const id_admin = req.usuario.id; 
+  const id_admin = req.usuario.id;
 
   if (!id_insumo || !cantidad_devuelta || !id_usuario_tecnico) {
-    return res.status(400).json({ message: 'Insumo, cantidad y técnico son requeridos' });
+    return res
+      .status(400)
+      .json({ message: "Insumo, cantidad y técnico son requeridos" });
   }
   if (cantidad_devuelta <= 0) {
-    return res.status(400).json({ message: 'La cantidad debe ser mayor a cero' });
+    return res
+      .status(400)
+      .json({ message: "La cantidad debe ser mayor a cero" });
   }
 
   let connection;
@@ -137,7 +137,7 @@ export const registrarDevolucion = async (req, res) => {
 
     // ---- PASO 1: Incrementar el Stock del Insumo ----
     await connection.query(
-      'UPDATE INSUMO SET stock_actual = stock_actual + ? WHERE PK_id_insumo = ?',
+      "UPDATE INSUMO SET stock_actual = stock_actual + ? WHERE PK_id_insumo = ?",
       [cantidad_devuelta, id_insumo]
     );
 
@@ -153,22 +153,26 @@ export const registrarDevolucion = async (req, res) => {
 
     // ----  ¡ÉXITO! Confirmar la transacción ----
     await connection.commit();
-    
-    // Consultamos el nuevo stock para devolverlo
-    const [stockRows] = await connection.query('SELECT stock_actual FROM INSUMO WHERE PK_id_insumo = ?', [id_insumo]);
-    
-    res.status(201).json({ 
-      message: 'Devolución registrada con éxito.',
-      nuevo_stock: stockRows[0].stock_actual
-    });
 
+    // Consultamos el nuevo stock para devolverlo
+    const [stockRows] = await connection.query(
+      "SELECT stock_actual FROM INSUMO WHERE PK_id_insumo = ?",
+      [id_insumo]
+    );
+
+    res.status(201).json({
+      message: "Devolución registrada con éxito.",
+      nuevo_stock: stockRows[0].stock_actual,
+    });
   } catch (error) {
     // ----  ¡ERROR! Revertir la transacción ----
     if (connection) {
       await connection.rollback();
     }
     console.error(error);
-    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
+    return res
+      .status(500)
+      .json({ message: error.message || "Error interno del servidor" });
   } finally {
     // 5. Siempre liberar la conexión
     if (connection) {
@@ -186,7 +190,7 @@ export const getPrestamosActivos = async (req, res) => {
   try {
     // Esta consulta usa GROUP BY y HAVING para encontrar préstamos
     // donde la suma de 'Préstamo' es MAYOR a la suma de 'Devolución'.
-    
+
     let query = `
       SELECT 
         m.FK_id_insumo,
@@ -203,12 +207,12 @@ export const getPrestamosActivos = async (req, res) => {
       JOIN USUARIO u ON m.FK_id_usuario = u.PK_id_usuario
       WHERE m.tipo_movimiento IN ('Préstamo', 'Devolución')
     `;
-    
+
     const queryParams = [];
 
     // Si NO es Admin (Rol 1), filtramos solo por su ID
     if (id_rol_token !== 1) {
-      query += ' AND m.FK_id_usuario = ?';
+      query += " AND m.FK_id_usuario = ?";
       queryParams.push(id_usuario_token);
     }
 
@@ -220,10 +224,11 @@ export const getPrestamosActivos = async (req, res) => {
 
     const [rows] = await pool.query(query, queryParams);
     res.json(rows);
-
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: error.message || 'Error interno del servidor' });
+    return res
+      .status(500)
+      .json({ message: error.message || "Error interno del servidor" });
   }
 };
 
@@ -340,11 +345,15 @@ export const getPrestamosActivos = async (req, res) => {
 
 // backend/controllers/movimiento.controller.js
 export const getHistorialMovimientos = async (req, res) => {
-  const { 
-    fecha_inicio, fecha_fin, id_categoria, id_usuario, tipo_movimiento,
+  const {
+    fecha_inicio,
+    fecha_fin,
+    id_categoria,
+    id_usuario,
+    tipo_movimiento,
     formato,
     page = 1,
-    limit = 10 // (Ajusta esto a tu ITEMS_PER_PAGE del frontend)
+    limit = 10, // (Ajusta esto a tu ITEMS_PER_PAGE del frontend)
   } = req.query;
 
   try {
@@ -357,35 +366,35 @@ export const getHistorialMovimientos = async (req, res) => {
       LEFT JOIN DOCUMENTO_INGRESO doc ON m.FK_id_documento = doc.PK_id_documento
       WHERE 1=1
     `;
-    
+
     const queryParams = [];
 
     if (fecha_inicio) {
-      queryBase += ' AND DATE(m.fecha_hora) >= ?';
+      queryBase += " AND DATE(m.fecha_hora) >= ?";
       queryParams.push(fecha_inicio);
     }
     if (fecha_fin) {
-      queryBase += ' AND DATE(m.fecha_hora) <= ?';
+      queryBase += " AND DATE(m.fecha_hora) <= ?";
       queryParams.push(fecha_fin);
     }
     if (id_categoria) {
-      queryBase += ' AND i.FK_id_categoria = ?';
+      queryBase += " AND i.FK_id_categoria = ?";
       queryParams.push(id_categoria);
     }
     if (id_usuario) {
-      queryBase += ' AND m.FK_id_usuario = ?';
+      queryBase += " AND m.FK_id_usuario = ?";
       queryParams.push(id_usuario);
     }
     if (tipo_movimiento) {
-      queryBase += ' AND m.tipo_movimiento = ?';
+      queryBase += " AND m.tipo_movimiento = ?";
       queryParams.push(tipo_movimiento);
     }
 
     // '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''' Decidir el formato de respuesta ---
-    
-    if (formato === 'excel') {
+
+    if (formato === "excel") {
       // --- RESPUESTA COMO EXCEL (RF-08) ---
-      
+
       // 1. Ejecutar la consulta SIN paginación
       const [rows] = await pool.query(
         `SELECT 
@@ -399,35 +408,34 @@ export const getHistorialMovimientos = async (req, res) => {
 
       // ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''Generar el libro Excel
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'BodeTICWeb';
+      workbook.creator = "BodeTICWeb";
       workbook.created = new Date();
-      const worksheet = workbook.addWorksheet('Historial de Movimientos');
+      const worksheet = workbook.addWorksheet("Historial de Movimientos");
 
       worksheet.columns = [
-        { header: 'ID', key: 'PK_id_movimiento', width: 10 },
-        { header: 'Fecha y Hora', key: 'fecha_hora', width: 25 },
-        { header: 'Tipo', key: 'tipo_movimiento', width: 15 },
-        { header: 'Insumo', key: 'nombre_insumo', width: 30 },
-        { header: 'Cantidad', key: 'cantidad', width: 10 },
-        { header: 'Usuario', key: 'nombre_usuario', width: 25 },
-        { header: 'OT', key: 'codigo_ot', width: 15 },
-        { header: 'Descripcion', key: 'descripcion', width: 40 },
+        { header: "ID", key: "PK_id_movimiento", width: 10 },
+        { header: "Fecha y Hora", key: "fecha_hora", width: 25 },
+        { header: "Tipo", key: "tipo_movimiento", width: 15 },
+        { header: "Insumo", key: "nombre_insumo", width: 30 },
+        { header: "Cantidad", key: "cantidad", width: 10 },
+        { header: "Usuario", key: "nombre_usuario", width: 25 },
+        { header: "OT", key: "codigo_ot", width: 15 },
+        { header: "Descripcion", key: "descripcion", width: 40 },
       ];
       worksheet.addRows(rows);
-      
+
       // '''''''''''''''''''''''''''''''''''''''''''''''''''''' Enviar el archivo al cliente
       res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
       res.setHeader(
-        'Content-Disposition',
+        "Content-Disposition",
         'attachment; filename="Reporte_BodeTIC.xlsx"'
       );
-      
+
       await workbook.xlsx.write(res);
       res.end(); // Finalizar la respuesta
-
     } else {
       // --- RESPUESTA COMO JSON (PAGINADA) ---
       const offset = (page - 1) * limit;
@@ -435,7 +443,7 @@ export const getHistorialMovimientos = async (req, res) => {
 
       // Consulta 1: Contar total de items (con filtros)
       const [countRows] = await pool.query(
-        `SELECT COUNT(*) as totalItems ${queryBase}`, 
+        `SELECT COUNT(*) as totalItems ${queryBase}`,
         queryParams
       );
       const totalItems = countRows[0].totalItems;
@@ -452,20 +460,21 @@ export const getHistorialMovimientos = async (req, res) => {
          LIMIT ? OFFSET ?`,
         [...queryParams, limitNumeric, offset]
       );
-      
+
       res.json({
         data: dataRows,
         pagination: {
           currentPage: parseInt(page, 10),
           totalPages: totalPages,
-          totalItems: totalItems
-        }
+          totalItems: totalItems,
+        },
       });
     }
-
   } catch (error) {
     console.error("Error en getHistorialMovimientos:", error);
     // Enviar un error JSON sin importar el formato pedido
-    res.status(500).json({ message: error.message || 'Error interno del servidor' });
+    res
+      .status(500)
+      .json({ message: error.message || "Error interno del servidor" });
   }
 };

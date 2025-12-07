@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from "../config/db.js";
 
 // GET (Buscar un documento por su código)
 export const getDocumentoByCodigo = async (req, res) => {
@@ -13,12 +13,14 @@ export const getDocumentoByCodigo = async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Documento no encontrado. Puedes crear uno nuevo.' });
+      return res
+        .status(404)
+        .json({ message: "Documento no encontrado. Puedes crear uno nuevo." });
     }
-    
+
     res.json(rows[0]); // Devolvemos el documento encontrado
   } catch (error) {
     console.error("Error en getDocumentoByCodigo:", error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
