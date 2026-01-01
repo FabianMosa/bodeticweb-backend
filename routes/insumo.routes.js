@@ -8,6 +8,7 @@ import {
   toggleInsumoActivo,
   getInsumoBySku,
 } from "../controllers/insumo.controller.js";
+import { upload } from "../middleware/upload.middleware.js";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get("/", verifyToken, getInsumos);
 
 // (Aquí añadiremos después: POST, PUT, DELETE)
 // POST /api/insumos (Protegida por Token Y por rol de Admin)
-router.post("/", [verifyToken, isAdmin], createInsumo);
+router.post("/", [verifyToken, isAdmin, upload.single("imagen")], createInsumo);
 
 // GET /api/insumos/:id (Protegida por Token)
 // La necesita el Admin (para editar) y el Técnico (para ver detalle)

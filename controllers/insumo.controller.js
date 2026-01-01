@@ -1,13 +1,30 @@
 import { pool } from "../config/db.js";
+import cloudinary from "../config/cloudinary.js";
+import { Readable } from "stream";
 
-//---------------------------------------------------------- GET (Leer todos los insumos)
+// Helper para subir buffer a Cloudinary (Promisificado)
+const uploadStream = (buffer) => {
+  return new Promise((resolve, reject) => {
+    const theTransformStream = cloudinary.uploader.upload_stream(
+      { folder: "bodetic_insumos" },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    let str = Readable.from(buffer);
+    str.pipe(theTransformStream);
+  });
+};
+
+// ---------------------------------------------------------- GET (Leer todos los insumos)
 export const getInsumos = async (req, res) => {
   const {
-    activo = "true", // Por defecto, solo trae activos
+    activo = "true",
     categoria = "",
     search = "",
     page = 1,
-    limit = 9, // (Asegúrarse que coincida con frontend)
+    limit = 9,
   } = req.query;
 
   const offset = (page - 1) * limit;
@@ -16,33 +33,31 @@ export const getInsumos = async (req, res) => {
   try {
     let queryParams = [];
 
-    // ---'''''''''''''''''''''''''''''''''''''''CONSTRUCCIÓN DE LA CONSULTA BASE ---
+    // Construcción de la consulta base
     let queryBase = `
       FROM INSUMO i
       JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
       WHERE 1=1
     `;
 
-    //''''''''''''''''''''''''''''''''''''''''''''' Filtro de Activo (true/false)
+    // Filtros
     if (activo === "true") {
       queryBase += " AND i.activo = 1";
     } else if (activo === "false") {
       queryBase += " AND i.activo = 0";
     }
 
-    //''''''''''''''''''''''''''''''''''''''''''''''''''''''' Filtro de Categoría
     if (categoria) {
       queryBase += " AND i.FK_id_categoria = ?";
       queryParams.push(categoria);
     }
 
-    // ----------------------------------------------------------- NUEVO FILTRO DE BÚSQUEDA POR NOMBRE ---
     if (search) {
       queryBase += " AND i.nombre LIKE ?";
-      queryParams.push(`%${search}%`); // Busca coincidencias parciales
+      queryParams.push(`%${search}%`);
     }
 
-    // -----------------------------------------------------------CONSULTA 1: Contar el total de items (con filtros) ---
+    // Consulta 1: Contar total
     const [countRows] = await pool.query(
       `SELECT COUNT(*) as totalItems ${queryBase}`,
       queryParams
@@ -50,21 +65,23 @@ export const getInsumos = async (req, res) => {
     const totalItems = countRows[0].totalItems;
     const totalPages = Math.ceil(totalItems / limitNumeric);
 
-    // -----------------------------------------------------------CONSULTA 2: Obtener los datos de la página actual ---
+    // Consulta 2: Obtener datos paginados
     const [dataRows] = await pool.query(
       `SELECT 
         i.PK_id_insumo, i.nombre, i.sku, 
         i.stock_actual, i.stock_minimo,
         c.nombre_categoria,
         i.activo,
-        i.FK_id_categoria          
+        i.FK_id_categoria,
+        i.imagen_ubicacion, -- Incluimos la imagen si existe
+        i.coordenada_x,
+        i.coordenada_y
       ${queryBase}
       ORDER BY i.nombre ASC
       LIMIT ? OFFSET ?`,
-      [...queryParams, limitNumeric, offset] // Añadir limit y offset
+      [...queryParams, limitNumeric, offset]
     );
 
-    // --------------------------------------------------------Devolver la respuesta paginada ---
     res.json({
       data: dataRows,
       pagination: {
@@ -79,7 +96,7 @@ export const getInsumos = async (req, res) => {
   }
 };
 
-// POST (Crear un Insumo)
+// ---------------------------------------------------------- POST (Crear un Insumo)
 export const createInsumo = async (req, res) => {
   const {
     nombre,
@@ -89,10 +106,14 @@ export const createInsumo = async (req, res) => {
     stock_minimo,
     id_categoria,
     fecha_vencimiento,
+    // Datos Documento
     id_documento_existente,
     id_proveedor,
     codigo_documento,
     fecha_emision,
+    // Datos Ubicación Visual
+    coordenada_x,
+    coordenada_y,
   } = req.body;
 
   const id_usuario_admin = req.usuario.id;
@@ -100,31 +121,44 @@ export const createInsumo = async (req, res) => {
   let connection;
   try {
     connection = await pool.getConnection();
-    await connection.beginTransaction(); // Iniciar Transacción
+    await connection.beginTransaction();
 
+    // 1. Gestión de Imagen (Cloudinary)
+    // Si viene un archivo en req.file, lo subimos.
+    let imageUrl = null;
+    if (req.file) {
+      try {
+        const result = await uploadStream(req.file.buffer);
+        imageUrl = result.secure_url;
+      } catch (uploadError) {
+        console.error("Error subiendo a Cloudinary:", uploadError);
+        throw new Error("Fallo al subir la imagen de ubicación.");
+      }
+    }
+
+    // 2. Gestión de Documento (Lógica de Reutilización)
     let finalDocumentoId;
 
-    // Lógica "Buscar o Crear" Documento
     if (id_documento_existente) {
-      // CASO A: El frontend ya nos dio el ID (el usuario usó el botón "Buscar")
+      // Caso A: El usuario seleccionó un documento existente en el frontend
       finalDocumentoId = id_documento_existente;
     } else {
-      // CASO B: No tenemos ID. Puede ser nuevo o el usuario no buscó.
+      // Caso B: Verificamos si el código de documento ya existe en la BD
       if (!id_proveedor || !codigo_documento || !fecha_emision) {
         throw new Error("Proveedor, N° de Documento y Fecha son requeridos.");
       }
 
-      // 1.1 Verificar si el documento YA EXISTE en la BBDD antes de insertar
+      // Verificamos antes de insertar
       const [existingDocs] = await connection.query(
         "SELECT PK_id_documento FROM DOCUMENTO_INGRESO WHERE codigo_documento = ?",
         [codigo_documento]
       );
 
       if (existingDocs.length > 0) {
-        // Usamos el ID existente y evitamos el error de duplicado
+        // ¡Ya existe! Lo reutilizamos silenciosamente
         finalDocumentoId = existingDocs[0].PK_id_documento;
       } else {
-        // NO EXISTE: Creamos uno nuevo
+        // No existe, creamos uno nuevo
         const [docResult] = await connection.query(
           `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
            VALUES (?, ?, ?)`,
@@ -134,10 +168,13 @@ export const createInsumo = async (req, res) => {
       }
     }
 
-    // Insertar el Insumo
+    // 3. Insertar el Insumo (Incluyendo Imagen y Coordenadas)
     const [insumoResult] = await connection.query(
-      `INSERT INTO INSUMO (nombre, sku, descripcion, stock_actual, stock_minimo, FK_id_categoria, fecha_vencimiento, activo) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      `INSERT INTO INSUMO (
+          nombre, sku, descripcion, stock_actual, stock_minimo, 
+          FK_id_categoria, fecha_vencimiento, activo,
+          imagen_ubicacion, coordenada_x, coordenada_y
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       [
         nombre,
         sku,
@@ -146,45 +183,52 @@ export const createInsumo = async (req, res) => {
         stock_minimo,
         id_categoria,
         fecha_vencimiento || null,
+        imageUrl, // URL de Cloudinary o null
+        coordenada_x || null,
+        coordenada_y || null,
       ]
     );
     const nuevoInsumoId = insumoResult.insertId;
 
-    // Insertar el Movimiento de 'Entrada'
+    // 4. Insertar el Movimiento de Entrada
     await connection.query(
       `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora, FK_id_documento) 
        VALUES (?, ?, 'Entrada', ?, NOW(), ?)`,
       [nuevoInsumoId, id_usuario_admin, stock_inicial, finalDocumentoId]
     );
 
-    // Confirmar la transacción
+    // Confirmar transacción
     await connection.commit();
 
     res.status(201).json({
       message: "Insumo creado y asociado al documento con éxito",
       id: nuevoInsumoId,
       documentoId: finalDocumentoId,
+      imagenUrl: imageUrl, // Devolvemos la URL por si el front la necesita
     });
-
-    // --- Manejo de errores y rollback ---
   } catch (error) {
-    if (connection) await connection.rollback(); // Revertir en caso de error
+    if (connection) await connection.rollback();
     console.error("Error en createInsumo:", error);
+
     if (error.code === "ER_DUP_ENTRY") {
-      return res.status(400).json({ message: "El SKU o Nombre ya existe." });
+      // Este error ahora solo saltaría si el SKU o Nombre del INSUMO se repiten,
+      // ya no por el documento.
+      return res
+        .status(400)
+        .json({ message: "El SKU o Nombre del insumo ya existe." });
     }
-    // Devolver el mensaje de error específico (ej. "Proveedor... es requerido")
+
     return res
       .status(500)
       .json({ message: error.message || "Error interno del servidor" });
   } finally {
-    if (connection) connection.release(); // Liberar la conexión
+    if (connection) connection.release();
   }
 };
 
-// GET (Leer UN insumo por ID)
+// ---------------------------------------------------------- GET, PUT, ETC. (Resto de funciones)
 export const getInsumoById = async (req, res) => {
-  const { id } = req.params; // Obtenemos el ID de la URL
+  const { id } = req.params;
   try {
     const [rows] = await pool.query(
       "SELECT * FROM INSUMO WHERE PK_id_insumo = ?",
@@ -195,18 +239,16 @@ export const getInsumoById = async (req, res) => {
       return res.status(404).json({ message: "Insumo no encontrado" });
     }
 
-    res.json(rows[0]); // Devolvemos solo el primer resultado
+    res.json(rows[0]);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
-// PUT (Actualizar un Insumo)
 export const updateInsumo = async (req, res) => {
   const { id } = req.params;
-  // OJO: No permitimos actualizar el stock_actual aquí.
-  // Eso debe ser a través de un MOVIMIENTO (Salida, Préstamo, Ajuste).
+  // Nota: Para actualizar la imagen se requeriría una lógica similar con multer en esta ruta
   const {
     nombre,
     sku,
@@ -244,7 +286,6 @@ export const updateInsumo = async (req, res) => {
     res.json({ message: "Insumo actualizado con éxito" });
   } catch (error) {
     console.error(error);
-    // Error común: SKU duplicado
     if (error.code === "ER_DUP_ENTRY") {
       return res
         .status(400)
@@ -254,12 +295,8 @@ export const updateInsumo = async (req, res) => {
   }
 };
 
-// PUT (Cambiar estado activo/inactivo de un Insumo)
 export const toggleInsumoActivo = async (req, res) => {
   const { id } = req.params;
-
-  // El frontend enviará el estado opuesto
-  // Ej: Si está activo (1), enviará 'false' para desactivarlo (0)
   const { nuevoEstado } = req.body;
 
   if (
@@ -293,9 +330,8 @@ export const toggleInsumoActivo = async (req, res) => {
 };
 
 export const getInsumoBySku = async (req, res) => {
-  const { sku } = req.params; // Obtenemos el SKU de la URL
+  const { sku } = req.params;
   try {
-    // Buscamos el insumo que esté activo y coincida con el SKU
     const [rows] = await pool.query(
       "SELECT * FROM INSUMO WHERE sku = ? AND activo = 1",
       [sku]
@@ -307,29 +343,9 @@ export const getInsumoBySku = async (req, res) => {
         .json({ message: "Insumo no encontrado o inactivo" });
     }
 
-    res.json(rows[0]); // Devolvemos el insumo
+    res.json(rows[0]);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
-
-// DELETE (Eliminar un Insumo - desactivado)
-/*export const deleteInsumo = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [result] = await pool.query(
-      `UPDATE INSUMO SET activo = 0 WHERE PK_id_insumo = ?`,
-      [id]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Insumo no encontrado' });
-    }
-
-    res.json({ message: 'Insumo eliminado (desactivado) con éxito' });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
-  }
-};*/
