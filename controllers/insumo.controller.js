@@ -24,11 +24,11 @@ export const getInsumos = async (req, res) => {
     categoria = "",
     search = "",
     page = 1,
-    limit = 9,
+    limit = 15,
   } = req.query;
 
   const offset = (page - 1) * limit;
-  const limitNumeric = parseInt(limit, 10);
+  const limitNumeric = parseInt(limit, 16);
 
   try {
     let queryParams = [];
@@ -85,7 +85,7 @@ export const getInsumos = async (req, res) => {
     res.json({
       data: dataRows,
       pagination: {
-        currentPage: parseInt(page, 10),
+        currentPage: parseInt(page, 16),
         totalPages: totalPages,
         totalItems: totalItems,
       },
