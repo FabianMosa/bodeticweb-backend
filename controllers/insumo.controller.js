@@ -73,7 +73,7 @@ export const getInsumos = async (req, res) => {
         c.nombre_categoria,
         i.activo,
         i.FK_id_categoria,
-        i.imagen_ubicacion, -- Incluimos la imagen si existe
+        i.imagen_ubicacion, 
         i.coordenada_x,
         i.coordenada_y
       ${queryBase}
@@ -124,7 +124,6 @@ export const createInsumo = async (req, res) => {
     await connection.beginTransaction();
 
     // 1. Gestión de Imagen (Cloudinary)
-    // Si viene un archivo en req.file, lo subimos.
     let imageUrl = null;
     if (req.file) {
       try {
@@ -136,29 +135,29 @@ export const createInsumo = async (req, res) => {
       }
     }
 
-    // 2. Gestión de Documento (Lógica de Reutilización)
+    // 2. Gestión de Documento (Lógica de Reutilización CORREGIDA)
     let finalDocumentoId;
 
     if (id_documento_existente) {
-      // Caso A: El usuario seleccionó un documento existente en el frontend
+      // Caso A: El usuario seleccionó un documento existente en el frontend (botón buscar)
       finalDocumentoId = id_documento_existente;
     } else {
-      // Caso B: Verificamos si el código de documento ya existe en la BD
+      // Caso B: No hay ID. Puede ser nuevo o el usuario escribió el código manualmente sin buscar.
       if (!id_proveedor || !codigo_documento || !fecha_emision) {
         throw new Error("Proveedor, N° de Documento y Fecha son requeridos.");
       }
 
-      // Verificamos antes de insertar
+      // IMPORTANTE: Verificamos si el código de documento YA EXISTE en la BD antes de insertar
       const [existingDocs] = await connection.query(
         "SELECT PK_id_documento FROM DOCUMENTO_INGRESO WHERE codigo_documento = ?",
         [codigo_documento]
       );
 
       if (existingDocs.length > 0) {
-        // ¡Ya existe! Lo reutilizamos silenciosamente
+        // ¡Ya existe! Lo reutilizamos silenciosamente y evitamos el error de duplicado
         finalDocumentoId = existingDocs[0].PK_id_documento;
       } else {
-        // No existe, creamos uno nuevo
+        // No existe, procedemos a crear uno nuevo
         const [docResult] = await connection.query(
           `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
            VALUES (?, ?, ?)`,
@@ -168,7 +167,7 @@ export const createInsumo = async (req, res) => {
       }
     }
 
-    // 3. Insertar el Insumo (Incluyendo Imagen y Coordenadas)
+    // 3. Insertar el Insumo
     const [insumoResult] = await connection.query(
       `INSERT INTO INSUMO (
           nombre, sku, descripcion, stock_actual, stock_minimo, 
@@ -203,16 +202,16 @@ export const createInsumo = async (req, res) => {
     res.status(201).json({
       message: "Insumo creado y asociado al documento con éxito",
       id: nuevoInsumoId,
-      documentoId: finalDocumentoId,
-      imagenUrl: imageUrl, // Devolvemos la URL por si el front la necesita
+      documentoId: finalDocumentoId, // Devolvemos el ID usado
+      imagenUrl: imageUrl,
     });
   } catch (error) {
     if (connection) await connection.rollback();
     console.error("Error en createInsumo:", error);
 
     if (error.code === "ER_DUP_ENTRY") {
-      // Este error ahora solo saltaría si el SKU o Nombre del INSUMO se repiten,
-      // ya no por el documento.
+      // Como ya manejamos el documento duplicado arriba, si salta este error
+      // es casi seguro que es por el SKU o Nombre del INSUMO.
       return res
         .status(400)
         .json({ message: "El SKU o Nombre del insumo ya existe." });
@@ -248,7 +247,6 @@ export const getInsumoById = async (req, res) => {
 
 export const updateInsumo = async (req, res) => {
   const { id } = req.params;
-  // Nota: Para actualizar la imagen se requeriría una lógica similar con multer en esta ruta
   const {
     nombre,
     sku,
@@ -319,9 +317,8 @@ export const toggleInsumoActivo = async (req, res) => {
     }
 
     res.json({
-      message: `Insumo ${
-        nuevoEstado ? "habilitado" : "deshabilitado"
-      } con éxito.`,
+      message: `Insumo ${nuevoEstado ? "habilitado" : "deshabilitado"
+        } con éxito.`,
     });
   } catch (error) {
     console.error(error);
