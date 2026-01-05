@@ -24,11 +24,11 @@ export const getInsumos = async (req, res) => {
     categoria = "",
     search = "",
     page = 1,
-    limit = 20,
+    limit = 15,
   } = req.query;
 
   const offset = (page - 1) * limit;
-  const limitNumeric = parseInt(limit, 21);
+  const limitNumeric = parseInt(limit, 16);
 
   try {
     let queryParams = [];
