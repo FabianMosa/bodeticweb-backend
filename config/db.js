@@ -9,13 +9,10 @@ const dbPassword = process.env.DB_PASSWORD || process.env.MYSQLPASSWORD;
 const dbDatabase = process.env.DB_DATABASE || process.env.MYSQLDATABASE;
 const dbPort = process.env.DB_PORT || process.env.MYSQLPORT || 3306; // ¡ESTE ES EL CAMBIO CLAVE!
 
-// Mensaje de depuración (puedes verlo en los logs de Railway)
-console.log("--- Intentando conectar a la BBDD ---");
-console.log(`Host: ${dbHost}`);
-console.log(`User: ${dbUser}`);
-console.log(`Database: ${dbDatabase}`);
-console.log(`Port: ${dbPort}`);
-console.log("---------------------------------");
+// Solo mostrar info de conexión en desarrollo (sin credenciales sensibles)
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`Conectando a BD: ${dbHost}:${dbPort}/${dbDatabase}`);
+}
 
 export const pool = mysql.createPool({
   host: dbHost,
