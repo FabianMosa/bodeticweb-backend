@@ -15,39 +15,45 @@ export const login = async (req, res) => {
     }
 
     // 2. Buscar al usuario en la BD por su RUT
-    const [rows] = await pool.query("SELECT * FROM USUARIO WHERE rut = ? ", [
+    const [rows] = await pool.query("SELECT * FROM USUARIO WHERE rut = ?", [
       rut,
     ]);
 
+    // Mensaje genérico para evitar enumeración de usuarios
+    const INVALID_CREDENTIALS_MSG = "Credenciales inválidas";
+
     if (rows.length === 0) {
-      // Si no hay filas, el usuario no existe
-      return res.status(404).json({ message: "Usuario no encontrado" });
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MSG });
     }
 
     const usuario = rows[0];
 
-    // 3. Comparar la contraseña ingresada con la de la BBDD
+    // 3. Verificar si el usuario está activo
+    if (usuario.activo === 0) {
+      return res.status(401).json({ message: "Usuario deshabilitado" });
+    }
+
+    // 4. Comparar la contraseña ingresada con la de la BBDD
     const isMatch = await bcrypt.compare(password, usuario.password_hash);
 
     if (!isMatch) {
-      // Si las contraseñas no coinciden
-      return res.status(401).json({ message: "Contraseña incorrecta" });
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MSG });
     }
 
-    // 4. Si todo es correcto, crear el Token (JWT)
+    // 5. Si todo es correcto, crear el Token (JWT)
     const tokenPayload = {
       id: usuario.PK_id_usuario,
-      rol: usuario.FK_id_rol, // ¡Muy importante para los permisos!
+      rol: usuario.FK_id_rol,
       nombre: usuario.nombre,
     };
 
     const token = jwt.sign(
       tokenPayload,
-      process.env.JWT_SECRET, // Tu palabra secreta del .env
-      { expiresIn: "8h" } // El token expirará en 8 horas
+      process.env.JWT_SECRET,
+      { expiresIn: "8h" }
     );
 
-    // 5. Enviar el token al frontend
+    // 6. Enviar el token al frontend
     res.json({
       message: "Login exitoso",
       token: token,
@@ -55,11 +61,6 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en el login:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Error interno del servidor-backend",
-        error: error.message,
-      });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };

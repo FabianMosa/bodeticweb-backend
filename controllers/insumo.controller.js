@@ -2,7 +2,7 @@ import { pool } from "../config/db.js";
 import cloudinary from "../config/cloudinary.js";
 import { Readable } from "stream";
 
-// Helper para subir buffer a Cloudinary (Promisificado)
+/** Sube un buffer de imagen a Cloudinary (carpeta bodetic_insumos) */
 const uploadStream = (buffer) => {
   return new Promise((resolve, reject) => {
     const theTransformStream = cloudinary.uploader.upload_stream(
@@ -10,14 +10,14 @@ const uploadStream = (buffer) => {
       (error, result) => {
         if (error) return reject(error);
         resolve(result);
-      }
+      },
     );
     let str = Readable.from(buffer);
     str.pipe(theTransformStream);
   });
 };
 
-// ---------------------------------------------------------- GET (Leer todos los insumos)
+/** GET /insumos — listado con filtros (activo, categoría, búsqueda) y paginación */
 export const getInsumos = async (req, res) => {
   const {
     activo = "true",
@@ -28,7 +28,7 @@ export const getInsumos = async (req, res) => {
   } = req.query;
 
   const offset = (page - 1) * limit;
-  const limitNumeric = parseInt(limit, 16);
+  const limitNumeric = parseInt(limit, 21);
 
   try {
     let queryParams = [];
@@ -60,7 +60,7 @@ export const getInsumos = async (req, res) => {
     // Consulta 1: Contar total
     const [countRows] = await pool.query(
       `SELECT COUNT(*) as totalItems ${queryBase}`,
-      queryParams
+      queryParams,
     );
     const totalItems = countRows[0].totalItems;
     const totalPages = Math.ceil(totalItems / limitNumeric);
@@ -79,13 +79,13 @@ export const getInsumos = async (req, res) => {
       ${queryBase}
       ORDER BY i.nombre ASC
       LIMIT ? OFFSET ?`,
-      [...queryParams, limitNumeric, offset]
+      [...queryParams, limitNumeric, offset],
     );
 
     res.json({
       data: dataRows,
       pagination: {
-        currentPage: parseInt(page, 21),
+        currentPage: parseInt(page, 10),
         totalPages: totalPages,
         totalItems: totalItems,
       },
@@ -96,7 +96,7 @@ export const getInsumos = async (req, res) => {
   }
 };
 
-// ---------------------------------------------------------- POST (Crear un Insumo)
+/** POST /insumos — crea insumo; opcional imagen (Cloudinary), documento y movimiento de entrada */
 export const createInsumo = async (req, res) => {
   const {
     nombre,
@@ -150,7 +150,7 @@ export const createInsumo = async (req, res) => {
       // IMPORTANTE: Verificamos si el código de documento YA EXISTE en la BD antes de insertar
       const [existingDocs] = await connection.query(
         "SELECT PK_id_documento FROM DOCUMENTO_INGRESO WHERE codigo_documento = ?",
-        [codigo_documento]
+        [codigo_documento],
       );
 
       if (existingDocs.length > 0) {
@@ -161,7 +161,7 @@ export const createInsumo = async (req, res) => {
         const [docResult] = await connection.query(
           `INSERT INTO DOCUMENTO_INGRESO (FK_id_proveedor, codigo_documento, fecha_emision)
            VALUES (?, ?, ?)`,
-          [id_proveedor, codigo_documento, fecha_emision]
+          [id_proveedor, codigo_documento, fecha_emision],
         );
         finalDocumentoId = docResult.insertId;
       }
@@ -185,7 +185,7 @@ export const createInsumo = async (req, res) => {
         imageUrl, // URL de Cloudinary o null
         coordenada_x || null,
         coordenada_y || null,
-      ]
+      ],
     );
     const nuevoInsumoId = insumoResult.insertId;
 
@@ -193,7 +193,7 @@ export const createInsumo = async (req, res) => {
     await connection.query(
       `INSERT INTO MOVIMIENTO (FK_id_insumo, FK_id_usuario, tipo_movimiento, cantidad, fecha_hora, FK_id_documento) 
        VALUES (?, ?, 'Entrada', ?, NOW(), ?)`,
-      [nuevoInsumoId, id_usuario_admin, stock_inicial, finalDocumentoId]
+      [nuevoInsumoId, id_usuario_admin, stock_inicial, finalDocumentoId],
     );
 
     // Confirmar transacción
@@ -225,13 +225,12 @@ export const createInsumo = async (req, res) => {
   }
 };
 
-// ---------------------------------------------------------- GET, PUT, ETC. (Resto de funciones)
 export const getInsumoById = async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query(
       "SELECT * FROM INSUMO WHERE PK_id_insumo = ?",
-      [id]
+      [id],
     );
 
     if (rows.length === 0) {
@@ -245,6 +244,7 @@ export const getInsumoById = async (req, res) => {
   }
 };
 
+/** PUT /insumos/:id — actualiza datos del insumo (sin imagen de ubicación) */
 export const updateInsumo = async (req, res) => {
   const { id } = req.params;
   const {
@@ -274,7 +274,7 @@ export const updateInsumo = async (req, res) => {
         id_categoria,
         fecha_vencimiento || null,
         id,
-      ]
+      ],
     );
 
     if (result.affectedRows === 0) {
@@ -293,6 +293,7 @@ export const updateInsumo = async (req, res) => {
   }
 };
 
+/** PUT /insumos/:id/toggle-activo — activa o desactiva el insumo */
 export const toggleInsumoActivo = async (req, res) => {
   const { id } = req.params;
   const { nuevoEstado } = req.body;
@@ -309,7 +310,7 @@ export const toggleInsumoActivo = async (req, res) => {
   try {
     const [result] = await pool.query(
       "UPDATE INSUMO SET activo = ? WHERE PK_id_insumo = ?",
-      [nuevoEstado, id]
+      [nuevoEstado, id],
     );
 
     if (result.affectedRows === 0) {
@@ -317,8 +318,9 @@ export const toggleInsumoActivo = async (req, res) => {
     }
 
     res.json({
-      message: `Insumo ${nuevoEstado ? "habilitado" : "deshabilitado"
-        } con éxito.`,
+      message: `Insumo ${
+        nuevoEstado ? "habilitado" : "deshabilitado"
+      } con éxito.`,
     });
   } catch (error) {
     console.error(error);
@@ -326,12 +328,13 @@ export const toggleInsumoActivo = async (req, res) => {
   }
 };
 
+/** GET /insumos/sku/:sku — busca por SKU (solo activos) */
 export const getInsumoBySku = async (req, res) => {
   const { sku } = req.params;
   try {
     const [rows] = await pool.query(
       "SELECT * FROM INSUMO WHERE sku = ? AND activo = 1",
-      [sku]
+      [sku],
     );
 
     if (rows.length === 0) {
@@ -343,6 +346,80 @@ export const getInsumoBySku = async (req, res) => {
     res.json(rows[0]);
   } catch (error) {
     console.error(error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+/** PUT /insumos/:id/ubicacion — actualiza imagen de ubicación (Cloudinary) y/o coordenada_x, coordenada_y */
+export const updateUbicacion = async (req, res) => {
+  const { id } = req.params;
+  const coordenada_x =
+    req.body.coordenada_x != null ? req.body.coordenada_x : null;
+  const coordenada_y =
+    req.body.coordenada_y != null ? req.body.coordenada_y : null;
+
+  try {
+    const [existing] = await pool.query(
+      "SELECT PK_id_insumo, imagen_ubicacion FROM INSUMO WHERE PK_id_insumo = ?",
+      [id],
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Insumo no encontrado" });
+    }
+
+    let imageUrl = null;
+    if (req.file) {
+      try {
+        const result = await uploadStream(req.file.buffer);
+        imageUrl = result.secure_url;
+      } catch (uploadError) {
+        console.error(
+          "Error subiendo imagen de ubicación a Cloudinary:",
+          uploadError,
+        );
+        return res
+          .status(500)
+          .json({ message: "Fallo al subir la imagen de ubicación." });
+      }
+    }
+
+    const updates = [];
+    const params = [];
+    if (imageUrl != null) {
+      updates.push("imagen_ubicacion = ?");
+      params.push(imageUrl);
+    }
+    if (coordenada_x != null && coordenada_x !== "") {
+      updates.push("coordenada_x = ?");
+      params.push(Number(coordenada_x));
+    }
+    if (coordenada_y != null && coordenada_y !== "") {
+      updates.push("coordenada_y = ?");
+      params.push(Number(coordenada_y));
+    }
+    if (updates.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Debe enviar al menos imagen o coordenadas." });
+    }
+    params.push(id);
+    await pool.query(
+      `UPDATE INSUMO SET ${updates.join(", ")} WHERE PK_id_insumo = ?`,
+      params,
+    );
+
+    const [updated] = await pool.query(
+      "SELECT imagen_ubicacion, coordenada_x, coordenada_y FROM INSUMO WHERE PK_id_insumo = ?",
+      [id],
+    );
+    res.json({
+      message: "Ubicación actualizada correctamente",
+      imagen_ubicacion: updated[0].imagen_ubicacion,
+      coordenada_x: updated[0].coordenada_x,
+      coordenada_y: updated[0].coordenada_y,
+    });
+  } catch (error) {
+    console.error("Error en updateUbicacion:", error);
     return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
