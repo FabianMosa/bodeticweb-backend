@@ -7,29 +7,22 @@ import {
   updateInsumo,
   toggleInsumoActivo,
   getInsumoBySku,
+  updateUbicacion,
 } from "../controllers/insumo.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 
 const router = Router();
 
-// Aplicamos el middleware 'verifyToken' a esta ruta.
-// Nadie podrá acceder a GET /api/insumos sin un token válido.
+// Listado con filtros y paginación (requiere token)
 router.get("/", verifyToken, getInsumos);
-
-// (Aquí añadiremos después: POST, PUT, DELETE)
-// POST /api/insumos (Protegida por Token Y por rol de Admin)
+// Crear insumo con imagen opcional (admin + multipart "imagen")
 router.post("/", [verifyToken, isAdmin, upload.single("imagen")], createInsumo);
 
-// GET /api/insumos/:id (Protegida por Token)
-// La necesita el Admin (para editar) y el Técnico (para ver detalle)
 router.get("/:id", verifyToken, getInsumoById);
-
-// PUT /api/insumos/:id (Protegida por Admin)
 router.put("/:id", [verifyToken, isAdmin], updateInsumo);
-// DELETE /api/insumos/:id (Protegida por Admin)
-
 router.put("/:id/toggle-activo", [verifyToken, isAdmin], toggleInsumoActivo);
-
 router.get("/sku/:sku", verifyToken, getInsumoBySku);
+// Actualizar foto de ubicación y/o coordenadas (admin + multipart "imagen_ubicacion")
+router.put("/:id/ubicacion", [verifyToken, isAdmin, upload.single("imagen_ubicacion")], updateUbicacion);
 
 export default router;

@@ -1,15 +1,11 @@
 import jwt from "jsonwebtoken";
 
-// ... (El código de verifyToken que ya teníamos) ...
+/** Verifica JWT en header Authorization (Bearer <token>) y deja el usuario en req.usuario */
 export const verifyToken = (req, res, next) => {
-  // El token vendrá en el header 'Authorization'
   const authHeader = req.headers["authorization"];
-
-  // El formato es "Bearer <token>"
   const token = authHeader && authHeader.split(" ")[1];
 
   if (token == null) {
-    // Si no hay token, no está autorizado
     return res
       .status(401)
       .json({ message: "No hay token, autorización denegada" });
@@ -19,18 +15,15 @@ export const verifyToken = (req, res, next) => {
     if (err) {
       return res.status(403).json({ message: "Token no es válido" });
     }
-    req.usuario = usuario; // Aquí guardamos el usuario (incluye el rol)
+    req.usuario = usuario;
     next();
   });
 };
 
-// --- AÑADIR ESTE NUEVO MIDDLEWARE ---
+/** Solo permite continuar si req.usuario.rol === 1 (Administrador) */
 export const isAdmin = (req, res, next) => {
-  // Asumimos que el rol de "Administrador" tiene el PK_id_rol = 1
-  // (Esto viene del token que guardamos en req.usuario)
-
   if (req.usuario && req.usuario.rol === 1) {
-    next(); // El usuario es Admin, puede continuar
+    next();
   } else {
     return res
       .status(403)
