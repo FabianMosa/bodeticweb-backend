@@ -3,6 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 
+// Importamos middlewares de seguridad
+import helmet from 'helmet'; // Protege cabeceras HTTP de vulnerabilidades
+import rateLimit from 'express-rate-limit'; // Limita accesos para frenar ataques de fuerza bruta
+
 // Rutas
 import authRoutes from './routes/auth.routes.js';
 import insumoRoutes from './routes/insumo.routes.js';
@@ -24,8 +28,31 @@ const corsOptions = {
 };
 
 // Middlewares
+
+// 1. Activa Helmet: inyecta cabeceras HTTP de seguridad automáticamente (ej. X-XSS-Protection, Strict-Transport-Security)
+app.use(helmet());
+
 app.use(cors(corsOptions)); 
 app.use(express.json()); 
+
+// 2. Limitador Global: Se evitan ataques de denegación de servicio (DDoS basicos)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 300, // Límite de 300 peticiones por ventana para IPs normales
+  message: { message: "Demasiadas peticiones al servidor, por favor inténtalo enseguida." },
+  standardHeaders: true, 
+  legacyHeaders: false, 
+});
+app.use(globalLimiter);
+
+// 3. Limitador Específico para Autenticación: Evita ataques de fuerza bruta en el Login
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10, // Si falla el login 10 veces, se bloquea la IP en ese endpoint por 15min
+  message: { message: "Demasiados intentos de inicio de sesión. Por favor, espere 15 minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Health check
 app.get('/', (req, res) => {
@@ -33,7 +60,8 @@ app.get('/', (req, res) => {
 });
 
 // Rutas API
-app.use('/api/auth', authRoutes);
+// Protegemos el router de login inyectando el authLimiter únicamente en su ruta
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/insumos', insumoRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/movimientos', movimientoRoutes);
