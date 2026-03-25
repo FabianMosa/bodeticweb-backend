@@ -20,20 +20,27 @@ import documentoRoutes from './routes/documento.routes.js';
 
 const app = express();
 
-// Configuración CORS
+// Orígenes permitidos: soporta múltiples URLs separadas por coma en FRONTEND_URL
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigins = FRONTEND_URL.split(',').map(u => u.trim());
+
 const corsOptions = {
-  origin: FRONTEND_URL,
-  optionsSuccessStatus: 200 
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200,
 };
 
-// Middlewares
+// CORS en todas las peticiones (incluye manejo automático de preflight OPTIONS)
+app.use(cors(corsOptions));
 
-// 1. Activa Helmet: inyecta cabeceras HTTP de seguridad automáticamente (ej. X-XSS-Protection, Strict-Transport-Security)
-app.use(helmet());
+// 3. Helmet: cabeceras de seguridad (después de CORS para no interferir con preflight)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
-app.use(cors(corsOptions)); 
-app.use(express.json()); 
+app.use(express.json());
 
 // 2. Limitador Global: Se evitan ataques de denegación de servicio (DDoS basicos)
 const globalLimiter = rateLimit({

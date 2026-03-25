@@ -191,20 +191,41 @@ export const getPrestamosActivos = async (req, res) => {
     // Esta consulta usa GROUP BY y HAVING para encontrar préstamos
     // donde la suma de 'Préstamo' es MAYOR a la suma de 'Devolución'.
 
+    // Incluimos descripción de insumo, categoría, stock actual y además
+    // la descripción del último préstamo para mostrar detalle en dashboard.
     let query = `
       SELECT 
         m.FK_id_insumo,
         i.nombre AS nombre_insumo,
+        i.descripcion AS descripcion_insumo,
         i.sku,
+        i.stock_actual,
+        c.nombre_categoria AS categoria,
         m.FK_id_usuario,
         u.nombre AS nombre_usuario,
+        u.rut AS rut_usuario,
         SUM(CASE WHEN m.tipo_movimiento = 'Préstamo' THEN m.cantidad ELSE 0 END) AS total_prestado,
         SUM(CASE WHEN m.tipo_movimiento = 'Devolución' THEN m.cantidad ELSE 0 END) AS total_devuelto,
         (SUM(CASE WHEN m.tipo_movimiento = 'Préstamo' THEN m.cantidad ELSE 0 END) -
-         SUM(CASE WHEN m.tipo_movimiento = 'Devolución' THEN m.cantidad ELSE 0 END)) AS cantidad_pendiente
+         SUM(CASE WHEN m.tipo_movimiento = 'Devolución' THEN m.cantidad ELSE 0 END)) AS cantidad_pendiente,
+        MAX(CASE WHEN m.tipo_movimiento = 'Préstamo' THEN m.fecha_hora ELSE NULL END) AS fecha_ultimo_prestamo,
+        SUBSTRING_INDEX(
+          GROUP_CONCAT(
+            CASE
+              WHEN m.tipo_movimiento = 'Préstamo'
+              THEN COALESCE(NULLIF(TRIM(m.descripcion), ''), 'Sin descripción')
+              ELSE NULL
+            END
+            ORDER BY m.fecha_hora DESC
+            SEPARATOR '||'
+          ),
+          '||',
+          1
+        ) AS descripcion_ultimo_prestamo
       FROM MOVIMIENTO m
       JOIN INSUMO i ON m.FK_id_insumo = i.PK_id_insumo
       JOIN USUARIO u ON m.FK_id_usuario = u.PK_id_usuario
+      LEFT JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
       WHERE m.tipo_movimiento IN ('Préstamo', 'Devolución')
     `;
 
@@ -217,7 +238,8 @@ export const getPrestamosActivos = async (req, res) => {
     }
 
     query += `
-      GROUP BY m.FK_id_insumo, m.FK_id_usuario, i.nombre, i.sku, u.nombre
+      GROUP BY m.FK_id_insumo, m.FK_id_usuario, i.nombre, i.descripcion, i.sku, i.stock_actual,
+               c.nombre_categoria, u.nombre, u.rut
       HAVING cantidad_pendiente > 0
       ORDER BY u.nombre, i.nombre;
     `;
