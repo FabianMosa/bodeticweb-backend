@@ -32,6 +32,7 @@ CREATE TABLE `insumo` (
   `stock_minimo` int NOT NULL DEFAULT '1',
   `fecha_vencimiento` date DEFAULT NULL,
   `activo` tinyint(1) NOT NULL DEFAULT '1',
+  `oculto_app` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 = retirado de la app; conserva trazabilidad en BD',
   `imagen_ubicacion` varchar(255) DEFAULT NULL,
   `coordenada_x` int DEFAULT NULL,
   `coordenada_y` int DEFAULT NULL,
@@ -48,7 +49,7 @@ CREATE TABLE `insumo` (
 
 LOCK TABLES `insumo` WRITE;
 /*!40000 ALTER TABLE `insumo` DISABLE KEYS */;
-INSERT INTO `insumo` VALUES (1,1,'Cable UTP Cat6 100m','Cable de red categoría 6, 100 metros','CAB-UTP6-100',25,10,NULL,1,NULL,NULL,NULL),(2,1,'Conector RJ45 Cat6','Conector modular 8P8C para Cat6','CON-RJ45-6',500,200,NULL,1,NULL,NULL,NULL),(3,1,'Patch Cord 1.5m','Cable de conexión 1.5 metros','CAB-PTCH-1.5',150,50,NULL,1,NULL,NULL,NULL),(4,1,'disco duro',NULL,'123456',2,1,NULL,0,NULL,NULL,NULL);
+INSERT INTO `insumo` VALUES (1,1,'Cable UTP Cat6 100m','Cable de red categoría 6, 100 metros','CAB-UTP6-100',25,10,NULL,1,0,NULL,NULL,NULL),(2,1,'Conector RJ45 Cat6','Conector modular 8P8C para Cat6','CON-RJ45-6',500,200,NULL,1,0,NULL,NULL,NULL),(3,1,'Patch Cord 1.5m','Cable de conexión 1.5 metros','CAB-PTCH-1.5',150,50,NULL,1,0,NULL,NULL,NULL),(4,1,'disco duro',NULL,'123456',2,1,NULL,0,0,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `insumo` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

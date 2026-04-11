@@ -50,7 +50,9 @@ bodeticweb-backend/
 │   └── documento.routes.js
 ├── models/                     # Vacío (queries directas en controllers)
 ├── context/
-│   └── script de base datos bodeticweb.sql
+│   └── scripts SQL por tabla (p. ej. `bodega_tic_insumo.sql`)
+├── migrations/
+│   └── `001_insumo_oculto_app.sql` (ALTER manual opcional; el arranque aplica lo mismo vía `config/ensureInsumoOcultoApp.js` si falta la columna)
 ├── index.js                    # Punto de entrada
 ├── package.json
 ├── .env
@@ -96,7 +98,7 @@ FRONTEND_URL=http://localhost:5173
 | USUARIO | Usuarios con roles | `PK_id_usuario`, `FK_id_rol`, `rut` (UNIQUE), `password_hash`, `activo` |
 | CATEGORIA | Clasificación de insumos | `PK_id_categoria`, `nombre_categoria` (UNIQUE) |
 | PROVEEDOR | Proveedores | `PK_id_proveedor`, `rut_proveedor` (UNIQUE), `nombre_proveedor` |
-| INSUMO | Productos del inventario | `PK_id_insumo`, `FK_id_categoria`, `sku` (UNIQUE), `stock_actual`, `stock_minimo`, `imagen_ubicacion`, `coordenada_x/y`, `activo` |
+| INSUMO | Productos del inventario | `PK_id_insumo`, `FK_id_categoria`, `sku` (UNIQUE), `stock_actual`, `stock_minimo`, `imagen_ubicacion`, `coordenada_x/y`, `activo`, `oculto_app` (retirado de la UI sin borrar fila) |
 | DOCUMENTO_INGRESO | Facturas/guías | `PK_id_documento`, `FK_id_proveedor`, `codigo_documento` (UNIQUE) |
 | HOJA_TERRENO | Órdenes de trabajo (OT) | `PK_id_ot`, `codigo_ot` (UNIQUE) |
 | MOVIMIENTO | Historial de movimientos | `PK_id_movimiento`, `FK_id_insumo`, `FK_id_usuario`, `FK_id_ot`, `FK_id_documento`, `tipo_movimiento` (ENUM), `cantidad` |
@@ -157,6 +159,9 @@ FRONTEND_URL=http://localhost:5173
 | POST | `/` | verifyToken, isAdmin, upload | Crear insumo (con imagen + documento) |
 | PUT | `/:id` | verifyToken, isAdmin | Actualizar insumo |
 | PUT | `/:id/toggle-activo` | verifyToken, isAdmin | Activar/Desactivar (soft delete) |
+| PUT | `/:id/ocultar-app` | verifyToken, isAdmin | Retirar de listados y escáner (papelera); no borra en BD |
+
+> Si el front muestra **«Ruta no encontrada»** (404) al usar *ocultar-app*, el proceso de Node suele estar ejecutando código antiguo: detén y vuelve a iniciar el backend (`npm run dev` o `node index.js`) tras actualizar el repositorio.
 | PUT | `/:id/ubicacion` | verifyToken, isAdmin, upload | Actualizar ubicación visual |
 
 **Query params (GET /):** `activo` (true/false/all), `categoria`, `search`, `page` (default: 1), `limit` (default: 15)
@@ -240,6 +245,7 @@ FRONTEND_URL=http://localhost:5173
 
 - **Transacciones MySQL** para operaciones críticas (crear insumo = imagen + documento + insumo + movimiento)
 - **Soft delete** con campo `activo` (insumos y usuarios no se eliminan)
+- **Retiro de UI** — campo `oculto_app` en `INSUMO`: insumos en papelera pueden ocultarse de la aplicación sin borrar la fila (trazabilidad de movimientos). En el arranque (no en tests) se ejecuta `ensureInsumoOcultoAppColumn()` para añadir la columna si no existe; alternativa manual: `migrations/001_insumo_oculto_app.sql`.
 - **Documentos reutilizables** — se detectan y reutilizan por código automáticamente
 - **Ubicación visual** — sistema de coordenadas X/Y sobre imagen para localizar insumos en bodega
 - **Exportación Excel** — historial de movimientos exportable a `.xlsx` con ExcelJS

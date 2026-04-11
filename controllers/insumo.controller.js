@@ -38,6 +38,7 @@ export const getInsumos = async (req, res) => {
       FROM INSUMO i
       JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
       WHERE 1=1
+        AND COALESCE(i.oculto_app, 0) = 0
     `;
 
     // Filtros
@@ -171,9 +172,9 @@ export const createInsumo = async (req, res) => {
     const [insumoResult] = await connection.query(
       `INSERT INTO INSUMO (
           nombre, sku, descripcion, stock_actual, stock_minimo, 
-          FK_id_categoria, fecha_vencimiento, activo,
+          FK_id_categoria, fecha_vencimiento, activo, oculto_app,
           imagen_ubicacion, coordenada_x, coordenada_y
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)`,
       [
         nombre,
         sku,
@@ -308,9 +309,12 @@ export const toggleInsumoActivo = async (req, res) => {
   }
 
   try {
+    // Al reactivar, limpiamos oculto_app para que vuelva al catálogo (recuperación vía API/BD).
     const [result] = await pool.query(
-      "UPDATE INSUMO SET activo = ? WHERE PK_id_insumo = ?",
-      [nuevoEstado, id],
+      `UPDATE INSUMO SET activo = ?, 
+        oculto_app = CASE WHEN ? = 1 THEN 0 ELSE oculto_app END 
+       WHERE PK_id_insumo = ?`,
+      [nuevoEstado, nuevoEstado ? 1 : 0, id],
     );
 
     if (result.affectedRows === 0) {
@@ -328,12 +332,55 @@ export const toggleInsumoActivo = async (req, res) => {
   }
 };
 
+/**
+ * PUT /insumos/:id/ocultar-app — retira el insumo de la aplicación (listados, escáner, alertas).
+ * Solo insumos en papelera (activo = 0). No borra la fila ni movimientos asociados.
+ */
+export const ocultarInsumoDeApp = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await pool.query(
+      "SELECT PK_id_insumo, activo, COALESCE(oculto_app, 0) AS oculto_app FROM INSUMO WHERE PK_id_insumo = ?",
+      [id],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Insumo no encontrado" });
+    }
+
+    const insumo = rows[0];
+    if (insumo.activo === 1) {
+      return res.status(400).json({
+        message:
+          "Solo se puede retirar de la aplicación un insumo que esté en la papelera (deshabilitado).",
+      });
+    }
+    if (insumo.oculto_app === 1) {
+      return res.status(400).json({ message: "El insumo ya está retirado de la aplicación." });
+    }
+
+    await pool.query(
+      "UPDATE INSUMO SET oculto_app = 1 WHERE PK_id_insumo = ?",
+      [id],
+    );
+
+    res.json({
+      message:
+        "Insumo retirado de la aplicación. Los datos permanecen en la base para trazabilidad.",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 /** GET /insumos/sku/:sku — busca por SKU (solo activos) */
 export const getInsumoBySku = async (req, res) => {
   const { sku } = req.params;
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM INSUMO WHERE sku = ? AND activo = 1",
+      "SELECT * FROM INSUMO WHERE sku = ? AND activo = 1 AND COALESCE(oculto_app, 0) = 0",
       [sku],
     );
 

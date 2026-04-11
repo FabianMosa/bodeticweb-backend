@@ -17,6 +17,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import rolRoutes from './routes/rol.routes.js';
 import proveedoresRoutes from './routes/proveedor.routes.js';
 import documentoRoutes from './routes/documento.routes.js';
+import { ensureInsumoOcultoAppColumn } from './config/ensureInsumoOcultoApp.js';
 
 const app = express();
 
@@ -92,12 +93,22 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Ruta no encontrada' });
 });
 
-// Iniciar servidor
+// Iniciar servidor (tras comprobar columna oculto_app para no tumbar GET /insumos)
 const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
-  });
+  ensureInsumoOcultoAppColumn()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Servidor corriendo en el puerto ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error(
+        'Error al aplicar migración automática oculto_app:',
+        err.message,
+      );
+      process.exit(1);
+    });
 }
 
 export default app;

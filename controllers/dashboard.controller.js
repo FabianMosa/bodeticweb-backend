@@ -7,7 +7,7 @@ export const getAlertas = async (req, res) => {
     const [stockBajo] = await pool.query(`
       SELECT PK_id_insumo, nombre, sku, stock_actual, stock_minimo
       FROM INSUMO
-      WHERE stock_actual <= stock_minimo AND activo = 1
+      WHERE stock_actual <= stock_minimo AND activo = 1 AND COALESCE(oculto_app, 0) = 0
       ORDER BY (stock_actual - stock_minimo) ASC
     `);
 
@@ -19,6 +19,7 @@ export const getAlertas = async (req, res) => {
       WHERE fecha_vencimiento IS NOT NULL
         AND fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         AND activo = 1
+        AND COALESCE(oculto_app, 0) = 0
       ORDER BY fecha_vencimiento ASC
     `);
 
