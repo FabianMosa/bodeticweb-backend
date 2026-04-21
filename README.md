@@ -179,7 +179,7 @@ FRONTEND_URL=http://localhost:5173
 | POST | `/salida` | verifyToken | Registrar salida (Uso o Préstamo) |
 | POST | `/devolucion` | verifyToken, isAdmin | Registrar devolución |
 | GET | `/prestamos` | verifyToken | Préstamos activos con pendientes |
-| GET | `/historial` | verifyToken, isAdmin | Historial filtrado + export Excel (incluye `codigo_documento`) |
+| GET | `/historial` | verifyToken, isAdmin | Historial filtrado + export Excel (incluye `codigo_documento`; para salidas sin documento usa el de entrada del insumo) |
 
 **Query params (GET /historial):** `fecha_inicio`, `fecha_fin`, `id_categoria`, `id_usuario`, `tipo_movimiento`, `formato` (json/excel), `page`, `limit`
 

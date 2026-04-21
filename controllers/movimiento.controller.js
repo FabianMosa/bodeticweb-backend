@@ -422,7 +422,22 @@ export const getHistorialMovimientos = async (req, res) => {
         `SELECT 
            m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
            i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
-           ot.codigo_ot, doc.codigo_documento, m.descripcion
+           ot.codigo_ot,
+           /* Para salidas sin FK_id_documento, heredamos el doc de entrada del insumo. */
+           COALESCE(
+             doc.codigo_documento,
+             (
+               SELECT d_in.codigo_documento
+               FROM MOVIMIENTO m_in
+               JOIN DOCUMENTO_INGRESO d_in
+                 ON d_in.PK_id_documento = m_in.FK_id_documento
+               WHERE m_in.FK_id_insumo = m.FK_id_insumo
+                 AND m_in.tipo_movimiento = 'Entrada'
+               ORDER BY m_in.fecha_hora ASC, m_in.PK_id_movimiento ASC
+               LIMIT 1
+             )
+           ) AS codigo_documento,
+           m.descripcion
          ${queryBase} 
          ORDER BY m.fecha_hora DESC`,
         queryParams
@@ -477,7 +492,22 @@ export const getHistorialMovimientos = async (req, res) => {
         `SELECT 
            m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
            i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
-           ot.codigo_ot, doc.codigo_documento, m.descripcion
+           ot.codigo_ot,
+           /* Para salidas sin FK_id_documento, heredamos el doc de entrada del insumo. */
+           COALESCE(
+             doc.codigo_documento,
+             (
+               SELECT d_in.codigo_documento
+               FROM MOVIMIENTO m_in
+               JOIN DOCUMENTO_INGRESO d_in
+                 ON d_in.PK_id_documento = m_in.FK_id_documento
+               WHERE m_in.FK_id_insumo = m.FK_id_insumo
+                 AND m_in.tipo_movimiento = 'Entrada'
+               ORDER BY m_in.fecha_hora ASC, m_in.PK_id_movimiento ASC
+               LIMIT 1
+             )
+           ) AS codigo_documento,
+           m.descripcion
          ${queryBase}
          ORDER BY m.fecha_hora DESC
          LIMIT ? OFFSET ?`,
