@@ -230,7 +230,22 @@ export const getInsumoById = async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM INSUMO WHERE PK_id_insumo = ?",
+      `SELECT 
+        i.*,
+        c.nombre_categoria,
+        (
+          SELECT d.codigo_documento
+          FROM MOVIMIENTO m
+          LEFT JOIN DOCUMENTO_INGRESO d
+            ON m.FK_id_documento = d.PK_id_documento
+          WHERE m.FK_id_insumo = i.PK_id_insumo
+            AND m.FK_id_documento IS NOT NULL
+          ORDER BY m.fecha_hora DESC, m.PK_id_movimiento DESC
+          LIMIT 1
+        ) AS codigo_documento
+      FROM INSUMO i
+      LEFT JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
+      WHERE i.PK_id_insumo = ?`,
       [id],
     );
 

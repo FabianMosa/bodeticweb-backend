@@ -422,7 +422,7 @@ export const getHistorialMovimientos = async (req, res) => {
         `SELECT 
            m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
            i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
-           ot.codigo_ot, m.descripcion
+           ot.codigo_ot, doc.codigo_documento, m.descripcion
          ${queryBase} 
          ORDER BY m.fecha_hora DESC`,
         queryParams
@@ -442,6 +442,7 @@ export const getHistorialMovimientos = async (req, res) => {
         { header: "Cantidad", key: "cantidad", width: 10 },
         { header: "Usuario", key: "nombre_usuario", width: 25 },
         { header: "OT", key: "codigo_ot", width: 15 },
+        { header: "Nro. documento", key: "codigo_documento", width: 20 },
         { header: "Descripcion", key: "descripcion", width: 40 },
       ];
       worksheet.addRows(rows);
@@ -476,7 +477,7 @@ export const getHistorialMovimientos = async (req, res) => {
         `SELECT 
            m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
            i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
-           ot.codigo_ot, m.descripcion
+           ot.codigo_ot, doc.codigo_documento, m.descripcion
          ${queryBase}
          ORDER BY m.fecha_hora DESC
          LIMIT ? OFFSET ?`,

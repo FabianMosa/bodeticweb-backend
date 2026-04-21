@@ -23,10 +23,39 @@ const app = express();
 
 // Orígenes permitidos: soporta múltiples URLs separadas por coma en FRONTEND_URL
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const allowedOrigins = FRONTEND_URL.split(',').map(u => u.trim());
+const envAllowedOrigins = FRONTEND_URL.split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
+
+// Lista por defecto para desarrollo local (permite cambios de puerto en Vite)
+const localDevOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+];
+
+const allowedOrigins = [...new Set([...envAllowedOrigins, ...localDevOrigins])];
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Permite herramientas sin Origin (curl/postman/health checks)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Coincidencia exacta por lista de variables y defaults locales
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Fallback para localhost/127.0.0.1 en cualquier puerto durante desarrollo local
+    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origen no permitido por CORS: ${origin}`));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,

@@ -25,6 +25,4 @@ dist-ssr
 *.sln
 *.sw?
 
-# Cursor rules and memory
-/.cursor/
-/.cursorrules/
+

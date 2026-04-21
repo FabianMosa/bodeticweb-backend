@@ -63,7 +63,7 @@ bodeticweb-backend/
 
 ```env
 # Servidor
-PORT=3000
+PORT=3001
 NODE_ENV=development
 
 # Base de datos (local)
@@ -136,6 +136,13 @@ FRONTEND_URL=http://localhost:5173
 | `verifyToken` | Valida JWT del header `Authorization: Bearer <token>`, inyecta `req.usuario` |
 | `isAdmin` | Verifica `req.usuario.rol === 1` |
 
+### CORS en desarrollo local
+
+- El backend acepta los orígenes definidos en `FRONTEND_URL` (soporta múltiples separados por coma).
+- Además, en entorno local permite `http://localhost:<puerto>` y `http://127.0.0.1:<puerto>` para evitar bloqueos de preflight cuando Vite cambia de puerto.
+- Si modificas `FRONTEND_URL` en `.env`, reinicia el proceso de Node para aplicar cambios.
+- Se recomienda ejecutar esta API en `http://localhost:3001` para evitar conflictos con otros proyectos que usan `3000`.
+
 ### Roles
 - **Rol 1:** Administrador — acceso total
 - **Rol 2:** Técnico/Usuario — acceso limitado (lectura, salidas de stock)
@@ -154,7 +161,7 @@ FRONTEND_URL=http://localhost:5173
 | Método | Endpoint | Middleware | Descripción |
 |--------|----------|------------|-------------|
 | GET | `/` | verifyToken | Listar insumos (paginado + filtros) |
-| GET | `/:id` | verifyToken | Obtener insumo por ID |
+| GET | `/:id` | verifyToken | Obtener insumo por ID (incluye `nombre_categoria` y último `codigo_documento` del insumo) |
 | GET | `/sku/:sku` | verifyToken | Buscar por SKU |
 | POST | `/` | verifyToken, isAdmin, upload | Crear insumo (con imagen + documento) |
 | PUT | `/:id` | verifyToken, isAdmin | Actualizar insumo |
@@ -172,7 +179,7 @@ FRONTEND_URL=http://localhost:5173
 | POST | `/salida` | verifyToken | Registrar salida (Uso o Préstamo) |
 | POST | `/devolucion` | verifyToken, isAdmin | Registrar devolución |
 | GET | `/prestamos` | verifyToken | Préstamos activos con pendientes |
-| GET | `/historial` | verifyToken, isAdmin | Historial filtrado + export Excel |
+| GET | `/historial` | verifyToken, isAdmin | Historial filtrado + export Excel (incluye `codigo_documento`) |
 
 **Query params (GET /historial):** `fecha_inicio`, `fecha_fin`, `id_categoria`, `id_usuario`, `tipo_movimiento`, `formato` (json/excel), `page`, `limit`
 
