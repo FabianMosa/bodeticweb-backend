@@ -233,16 +233,26 @@ export const getInsumoById = async (req, res) => {
       `SELECT 
         i.*,
         c.nombre_categoria,
-        (
+        /* Documento con el que se ingresó el insumo (primera entrada). */
+        COALESCE((
           SELECT d.codigo_documento
           FROM MOVIMIENTO m
-          LEFT JOIN DOCUMENTO_INGRESO d
+          JOIN DOCUMENTO_INGRESO d
             ON m.FK_id_documento = d.PK_id_documento
           WHERE m.FK_id_insumo = i.PK_id_insumo
-            AND m.FK_id_documento IS NOT NULL
+            AND m.tipo_movimiento = 'Entrada'
+          ORDER BY m.fecha_hora ASC, m.PK_id_movimiento ASC
+          LIMIT 1
+        ), (
+          /* Fallback para datos históricos: último movimiento que sí tenga documento. */
+          SELECT d.codigo_documento
+          FROM MOVIMIENTO m
+          JOIN DOCUMENTO_INGRESO d
+            ON m.FK_id_documento = d.PK_id_documento
+          WHERE m.FK_id_insumo = i.PK_id_insumo
           ORDER BY m.fecha_hora DESC, m.PK_id_movimiento DESC
           LIMIT 1
-        ) AS codigo_documento
+        )) AS codigo_documento
       FROM INSUMO i
       LEFT JOIN CATEGORIA c ON i.FK_id_categoria = c.PK_id_categoria
       WHERE i.PK_id_insumo = ?`,
