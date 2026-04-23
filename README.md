@@ -2,6 +2,12 @@
 
 API REST desarrollada con **Node.js** y **Express 5** que provee todos los servicios para el sistema de gestión de inventario BodeTIC. Gestiona autenticación JWT, CRUD de insumos, control de movimientos de stock, usuarios con roles, proveedores, documentos de ingreso y exportación de reportes a Excel.
 
+## Acceso rápido
+
+- Frontend complementario (cliente): [`../bodeticweb-frontend/README.md`](../bodeticweb-frontend/README.md)
+- Requisitos mínimos: Node.js LTS + npm + MySQL
+- URL local por defecto: `http://localhost:3001`
+
 ## Stack Tecnológico
 
 | Paquete | Versión | Propósito |
@@ -267,13 +273,16 @@ npm run dev    # Desarrollo con nodemon
 npm start      # Producción
 ```
 
-### Desarrollo fullstack (backend + frontend)
+### Ejecución local independiente
 
-Desde la carpeta raíz `bodegaweb`, puedes levantar backend y frontend juntos con:
+Este backend está documentado para ejecutarse de forma independiente dentro de su propio repositorio/directorio:
 
 ```bash
+npm install
 npm run dev
 ```
+
+> Verifica que `.env` tenga `PORT`, credenciales de base de datos, `JWT_SECRET` y `FRONTEND_URL` correctamente configurados.
 
 ## Despliegue
 
