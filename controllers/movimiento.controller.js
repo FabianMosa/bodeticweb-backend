@@ -373,12 +373,30 @@ export const getHistorialMovimientos = async (req, res) => {
     id_categoria,
     id_usuario,
     tipo_movimiento,
+    codigo_documento,
     formato,
     page = 1,
     limit = 10, // (Ajusta esto a tu ITEMS_PER_PAGE del frontend)
   } = req.query;
 
   try {
+    // Expresión reutilizable para heredar documento de entrada cuando el movimiento no trae FK_id_documento.
+    const codigoDocumentoSql = `
+      COALESCE(
+        doc.codigo_documento,
+        (
+          SELECT d_in.codigo_documento
+          FROM MOVIMIENTO m_in
+          JOIN DOCUMENTO_INGRESO d_in
+            ON d_in.PK_id_documento = m_in.FK_id_documento
+          WHERE m_in.FK_id_insumo = m.FK_id_insumo
+            AND m_in.tipo_movimiento = 'Entrada'
+          ORDER BY m_in.fecha_hora ASC, m_in.PK_id_movimiento ASC
+          LIMIT 1
+        )
+      )
+    `;
+
     // --- 1. Construcción de la Consulta Dinámica (Base) ---
     let queryBase = `
       FROM MOVIMIENTO m
@@ -411,6 +429,11 @@ export const getHistorialMovimientos = async (req, res) => {
       queryBase += " AND m.tipo_movimiento = ?";
       queryParams.push(tipo_movimiento);
     }
+    if (codigo_documento?.trim()) {
+      // Filtro parcial para permitir buscar factura/guía aun cuando venga heredada desde el ingreso.
+      queryBase += ` AND ${codigoDocumentoSql} LIKE ?`;
+      queryParams.push(`%${codigo_documento.trim()}%`);
+    }
 
     // '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''' Decidir el formato de respuesta ---
 
@@ -423,20 +446,7 @@ export const getHistorialMovimientos = async (req, res) => {
            m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
            i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
            ot.codigo_ot,
-           /* Para salidas sin FK_id_documento, heredamos el doc de entrada del insumo. */
-           COALESCE(
-             doc.codigo_documento,
-             (
-               SELECT d_in.codigo_documento
-               FROM MOVIMIENTO m_in
-               JOIN DOCUMENTO_INGRESO d_in
-                 ON d_in.PK_id_documento = m_in.FK_id_documento
-               WHERE m_in.FK_id_insumo = m.FK_id_insumo
-                 AND m_in.tipo_movimiento = 'Entrada'
-               ORDER BY m_in.fecha_hora ASC, m_in.PK_id_movimiento ASC
-               LIMIT 1
-             )
-           ) AS codigo_documento,
+           ${codigoDocumentoSql} AS codigo_documento,
            m.descripcion
          ${queryBase} 
          ORDER BY m.fecha_hora DESC`,
@@ -493,20 +503,7 @@ export const getHistorialMovimientos = async (req, res) => {
            m.PK_id_movimiento, m.fecha_hora, m.tipo_movimiento, m.cantidad,
            i.nombre AS nombre_insumo, u.nombre AS nombre_usuario,
            ot.codigo_ot,
-           /* Para salidas sin FK_id_documento, heredamos el doc de entrada del insumo. */
-           COALESCE(
-             doc.codigo_documento,
-             (
-               SELECT d_in.codigo_documento
-               FROM MOVIMIENTO m_in
-               JOIN DOCUMENTO_INGRESO d_in
-                 ON d_in.PK_id_documento = m_in.FK_id_documento
-               WHERE m_in.FK_id_insumo = m.FK_id_insumo
-                 AND m_in.tipo_movimiento = 'Entrada'
-               ORDER BY m_in.fecha_hora ASC, m_in.PK_id_movimiento ASC
-               LIMIT 1
-             )
-           ) AS codigo_documento,
+           ${codigoDocumentoSql} AS codigo_documento,
            m.descripcion
          ${queryBase}
          ORDER BY m.fecha_hora DESC

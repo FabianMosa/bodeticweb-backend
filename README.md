@@ -179,9 +179,9 @@ FRONTEND_URL=http://localhost:5173
 | POST | `/salida` | verifyToken | Registrar salida (Uso o Préstamo) |
 | POST | `/devolucion` | verifyToken, isAdmin | Registrar devolución |
 | GET | `/prestamos` | verifyToken | Préstamos activos con pendientes |
-| GET | `/historial` | verifyToken, isAdmin | Historial filtrado + export Excel (incluye `codigo_documento`; para salidas sin documento usa el de entrada del insumo) |
+| GET | `/historial` | verifyToken, isAdmin | Historial filtrado + export Excel (incluye `codigo_documento`; para salidas sin documento usa el de entrada del insumo; permite filtrar por número de documento) |
 
-**Query params (GET /historial):** `fecha_inicio`, `fecha_fin`, `id_categoria`, `id_usuario`, `tipo_movimiento`, `formato` (json/excel), `page`, `limit`
+**Query params (GET /historial):** `fecha_inicio`, `fecha_fin`, `id_categoria`, `id_usuario`, `tipo_movimiento`, `codigo_documento`, `formato` (json/excel), `page`, `limit`
 
 ### Usuarios — `/api/usuarios`
 | Método | Endpoint | Middleware | Descripción |
@@ -265,6 +265,14 @@ FRONTEND_URL=http://localhost:5173
 npm install    # Instalar dependencias
 npm run dev    # Desarrollo con nodemon
 npm start      # Producción
+```
+
+### Desarrollo fullstack (backend + frontend)
+
+Desde la carpeta raíz `bodegaweb`, puedes levantar backend y frontend juntos con:
+
+```bash
+npm run dev
 ```
 
 ## Despliegue
